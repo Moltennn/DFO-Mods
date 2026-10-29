@@ -154,9 +154,7 @@ function syncCorpses() {
   if (!Array.isArray(foes)) return;
   for (const foe of foes) {
     if (!foe || !foe.dead || !foe.corpse) continue;
-    const items = foe.entity?.items;
-    if (!Array.isArray(items) || !items.length) continue;
-    const hide = allFiltered(items);
+    const hide = hideCorpse(foe);
     if (hide && !foe.corpseDisabled) { foe.corpseDisabled = true; foe._dfoHidden = true; }
     else if (!hide && foe._dfoHidden) { foe.corpseDisabled = false; foe._dfoHidden = false; }
   }
@@ -182,11 +180,16 @@ function syncPiles() {
   }
 }
 
-/** The renderer asks this before standing a dead foe's body. */
+/** Nothing on the body would be shown: it is empty, or every item is filtered. */
+export function hideItems(items) {
+  if (!cfg?.on) return false;
+  if (!Array.isArray(items) || items.length === 0) return true;
+  return items.every((item) => !keep(item));
+}
+/** The renderer asks this before standing a dead foe's body (and its sprite). */
 export function hideCorpse(foe) {
   if (!cfg?.on || !foe?.dead) return false;
-  const items = foe.entity?.items;
-  return Array.isArray(items) && items.length > 0 && items.every((item) => !keep(item));
+  return hideItems(foe.entity?.items);
 }
 
 /* ---------------------------------------------------------------- config */

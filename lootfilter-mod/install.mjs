@@ -109,6 +109,9 @@ function exposeFoeManager(text) {
 /* The corpse body is drawn by the foe renderer: a dead foe with a corpse is
  * "stood" as a foe body. Skip that draw when the filter hides the whole body. */
 const CORPSE_RX = /([A-Za-z0-9_$]+)\.dead&&\1\.corpse&&!\1\.corpseDestroyed&&/;
+const A_MARK = 'i.pixelKey=e.corpsePixelKey=t';
+const A_DRAWLIST = 'return[...o,...ne.map(e=>e.batch),...ie.batches()]';
+const B_DRAWLIST = 'return[...o,...ne.filter(e=>!(e.dfoFoe&&globalThis.__dfoRowFilter?.hideCorpse?.(e.dfoFoe))).map(e=>e.batch),...ie.batches()]';
 
 /* ------------------------------------------------------- the row hook */
 /* The row builder's item name is the one stable shape (`name:<fn>(e).name||
@@ -218,6 +221,17 @@ function installNow() {
         if (!m) die('the corpse body draw anchor was not found - aborting (nothing written)');
         text = text.replace(CORPSE_RX, `${m[1]}.dead&&${m[1]}.corpse&&!${m[1]}.corpseDestroyed&&!(globalThis.__dfoRowFilter?.hideCorpse?.(${m[1]}))&&`);
         log(`  patched ${bodies.rel} (corpse body draw)`);
+      }
+      /* the corpse's own billboard sprite: tag it with its foe and skip it in the draw list */
+      if (!text.includes('i.dfoFoe=e')) {
+        if (!text.includes(A_MARK)) die('the corpse marker anchor was not found - aborting (nothing written)');
+        text = text.replace(A_MARK, `${A_MARK},i.dfoFoe=e`);
+        log(`  patched ${bodies.rel} (corpse marker tagged)`);
+      }
+      if (!text.includes('.dfoFoe&&globalThis.__dfoRowFilter')) {
+        if (!text.includes(A_DRAWLIST)) die('the corpse sprite draw list was not found - aborting (nothing written)');
+        text = text.replace(A_DRAWLIST, B_DRAWLIST);
+        log(`  patched ${bodies.rel} (corpse sprite hidden)`);
       }
       store.write(bodies.rel, Buffer.from(text));
       checks.push({ rel: bodies.rel, has: 'hideCorpse' });

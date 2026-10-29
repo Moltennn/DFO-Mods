@@ -493,11 +493,12 @@ its items are untouched, and it wakes up — sprite, plaque and all — as soon 
 the filter lets one of them through or is turned off. While hidden it is out of
 reach (no plaque, not in Take all), which is the point of hiding it.
 
-**Corpses** behave the same way. A dead body whose items are all filtered is
-hidden as a whole: the corpse body is skipped by the foe renderer (the same
-filter decides it every frame), and its loot target, hover name and plaque go
-with it (`corpseDisabled`). The body and its items are untouched — clear the
-filter and the corpse is back, lootable again.
+**Corpses** behave the same way. A dead body with nothing left to show — every
+item filtered **or no items at all** — is hidden as a whole: the foe renderer
+skips the 3-D body, the corpse's own billboard sprite is skipped in the draw
+list, and its loot target, hover name and plaque go with it
+(`corpseDisabled`). The body and its items are untouched — clear the filter and
+the corpse is back, sprite and loot and all.
 
 **ESC → Mods → Loot Filter** holds the rules; settings live in
 `localStorage['dfoLootFilter.config.v1']`.
@@ -510,9 +511,10 @@ filter and the corpse is back, lootable again.
 2. `assets/world-*.js` — exposes the dropped-pile manager as `__dfoPiles` and
    the foe manager as `__dfoFoes`, so the mod can sleep a whole pile and read a
    corpse's items.
-3. `assets/deepWaterRuntime-*.js` — the corpse-body draw asks
-   `__dfoRowFilter.hideCorpse(foe)` before standing a dead body (shared with UI
-   Tweaks' data-tier patch, which preserves it).
+3. `assets/deepWaterRuntime-*.js` — the corpse-body draw and the corpse's
+   billboard sprite both ask `__dfoRowFilter.hideCorpse(foe)` (the sprite is
+   tagged with its foe at creation); shared with UI Tweaks' data-tier patch,
+   which preserves it.
 4. `assets/dfo-lootfilter.js` — the mod itself.
 
 Uninstalling leaves the hooks inert; no game data is touched.

@@ -152,12 +152,14 @@ node install.mjs --app="C:\Program Files\DFO Online"
 
 Everything is in the game's **ESC (pause) menu → Mods** (Enhanced skin):
 
-- **Reload all** in the footer bar re-imports every registered mod (that bar also
-  carries the credit, the repo link and the loaded builds).
-- **Reload** beside a mod's name re-imports that mod.
-- Each mod's section holds its settings. For **Skill Tracker**: panel opacity,
-  row spacing, **Show/Hide panel**, reset placement, and the tracked-skill
-  checklist (three columns when the pane is wide enough, two when it is not).
+- Each mod gets its own band — its name, its loaded **build** hash and a
+  **Reload** button — with the same rule between bands that the footer uses.
+- **Reload all** sits on the right of the footer bar (the footer carries the
+  credit and the repo link on the left).
+- Each mod's band holds its settings. For **Skill Tracker**: panel opacity
+  (with its percentage), row spacing, **Show/Hide panel**, reset placement, and
+  the tracked-skill checklist (three columns when the pane is wide enough, two
+  when it is not).
 
 A reload re-reads the registry: a mod whose `MOD_BUILD` changed is unmounted
 and replaced; a mod removed from the registry is unloaded; an unchanged import
@@ -227,8 +229,9 @@ where `boot.js` also lives). A mod module exports:
 | `unmount()` | remove everything `install()` added |
 | `mountPane(container)` | optional; the loader gives it its own section in ESC → Mods |
 
-The Mods pane renders one section per mod, headed with the registry `name`.
-Reloads use the same lifecycle: unmount, re-import, install. The pane scrolls in
+The Mods pane renders one band per mod, headed with the registry `name` and
+the module's loaded `MOD_BUILD`. Reloads use the same lifecycle: unmount,
+re-import, install. The pane scrolls in
 its own well (the game's window around it does not move), and its footer carries
 the credit, the repo link and the loaded `MOD_BUILD` hashes.
 

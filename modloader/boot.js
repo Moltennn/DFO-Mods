@@ -11,9 +11,10 @@
  *   unmount()   remove everything install() put in the page
  *   mountPane(container)   optional: a section in the ESC menu's Mods pane
  *
- * There are no hotkeys. ESC -> Mods has "Reload all" at the top and a
- * "Reload" button per mod; the same two doors exist as
- * globalThis.__dfoReloadMods() and globalThis.__dfoModsReloadOne(id).
+ * There are no hotkeys. ESC -> Mods shows one band per mod (name, its
+ * MOD_BUILD, a "Reload" button) and "Reload all" on the right of the footer;
+ * the same two doors exist as globalThis.__dfoReloadMods() and
+ * globalThis.__dfoModsReloadOne(id).
  */
 'use strict';
 
@@ -128,19 +129,7 @@ function creditLine() {
   link.style.cssText = 'color:var(--brass,#c08a3e);text-decoration:none;border-bottom:1px solid currentColor';
   left.append(by, name, dot, link);
 
-  // The build hash lives here now (the mods used to print it in their own
-  // settings rows): one clean tail for every mod, and it is what the loader
-  // compares on reload.
-  const builds = [...new Set([...state.active.values()].map((r) => r.build).filter(Boolean))];
-  if (builds.length) {
-    const bd = document.createElement('span');
-    bd.textContent = '\u00b7';
-    const build = document.createElement('span');
-    build.title = 'MOD_BUILD: which module text is loaded; Reload re-imports when it changes';
-    build.textContent = `build ${builds.map((b) => String(b).slice(0, 8)).join(', ')}`;
-    build.style.cssText = 'font-variant-numeric:tabular-nums;opacity:.8';
-    left.append(bd, build);
-  }
+  /* the footer is the credit line and one door: Reload all, on the right */
   line.append(left, paneButton('Reload all', () => { reloadAll(true); }));
   return line;
 }
@@ -187,16 +176,30 @@ globalThis.__dfoModsPane = function (container) {
   let any = false;
   for (const [id, rec] of state.active) {
     if (typeof rec.module?.mountPane !== 'function') continue;
+    const first = !any;
     any = true;
     const section = document.createElement('section');
     section.className = 'dfo-mod-pane';
     section.dataset.mod = id;
+    /* the same rule the footer uses, so each mod is its own band */
+    if (!first) section.style.cssText = 'margin-top:14px;padding-top:10px;border-top:1px solid var(--iron,#2b323b)';
     const heading = document.createElement('div');
-    heading.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;margin:10px 0 4px';
+    heading.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 4px';
+    const name = document.createElement('div');
+    name.style.cssText = 'display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px;min-width:0';
     const title = document.createElement('div');
     title.textContent = rec.name || id;
     title.style.cssText = 'letter-spacing:.18em;text-transform:uppercase;font-size:12px;color:var(--brass,#c08a3e)';
-    heading.append(title, paneButton('Reload', () => { reloadOne(id); }));
+    name.appendChild(title);
+    if (rec.build) {
+      /* MOD_BUILD next to the mod it belongs to - the loader compares it on reload */
+      const build = document.createElement('span');
+      build.title = 'MOD_BUILD: which module text is loaded; Reload re-imports when it changes';
+      build.textContent = `build ${String(rec.build).slice(0, 8)}`;
+      build.style.cssText = 'color:var(--dim,#b9b2a1);font-size:11px;font-variant-numeric:tabular-nums;opacity:.85';
+      name.appendChild(build);
+    }
+    heading.append(name, paneButton('Reload', () => { reloadOne(id); }));
     const body = document.createElement('div');
     body.className = 'dfo-mod-pane-body';
     section.append(heading, body);

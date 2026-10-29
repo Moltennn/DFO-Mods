@@ -500,17 +500,30 @@ export function mountPane(container) {
     b.style.cssText = 'cursor:pointer;background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:2px 10px';
     onclick && (b.onclick = onclick); return b; };
 
+  /* The slider and a value label, in the same box the row-spacing slider uses,
+   * so both sliders start at the same x and the numbers line up under each
+   * other. */
+  const opWrap = document.createElement('span');
+  opWrap.style.cssText = 'display:flex;gap:6px;align-items:center;justify-content:flex-end';
   const op = document.createElement('input'); op.type = 'range'; op.min = '30'; op.max = '100';
   op.value = String(Math.round((cfg.opacity ?? .92) * 100)); op.style.width = '140px';
-  op.oninput = () => { cfg.opacity = op.value / 100; save(); place(); };
-  row('Panel opacity', op);
+  const opLabel = document.createElement('span');
+  opLabel.style.cssText = 'color:var(--dim,#b9b2a1);font-size:12px;min-width:34px;text-align:right;font-variant-numeric:tabular-nums';
+  opLabel.textContent = op.value + '%';
+  op.oninput = () => {
+    cfg.opacity = op.value / 100; save(); place();
+    opLabel.textContent = op.value + '%';
+  };
+  opWrap.append(op, opLabel);
+  row('Panel opacity', opWrap);
 
   // px between rows: 0 = fully packed, 10 = airy
   const gap = document.createElement('input'); gap.type = 'range'; gap.min = String(ROW_GAP_MIN); gap.max = String(ROW_GAP_MAX);
   gap.step = '1'; gap.value = String(cfg.rowGap); gap.style.width = '140px';
-  const gapLabel = document.createElement('span'); gapLabel.style.cssText = 'color:var(--dim,#b9b2a1);font-size:12px';
+  const gapLabel = document.createElement('span');
+  gapLabel.style.cssText = 'color:var(--dim,#b9b2a1);font-size:12px;min-width:34px;text-align:right;font-variant-numeric:tabular-nums';
   gapLabel.textContent = cfg.rowGap + 'px';
-  const gapWrap = document.createElement('span'); gapWrap.style.cssText = 'display:flex;gap:6px;align-items:center';
+  const gapWrap = document.createElement('span'); gapWrap.style.cssText = 'display:flex;gap:6px;align-items:center;justify-content:flex-end';
   gapWrap.append(gap, gapLabel);
   gap.oninput = () => { cfg.rowGap = Math.min(ROW_GAP_MAX, Math.max(ROW_GAP_MIN, Math.round(+gap.value))); save(); render(); gapLabel.textContent = cfg.rowGap + 'px'; };
   row('Row spacing', gapWrap);

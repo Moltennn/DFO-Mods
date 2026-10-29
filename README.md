@@ -411,14 +411,22 @@ the pane sets 3–20. The plaque hangs below the crosshair and grows downward, s
 a tall list is lifted by just enough to keep its bottom clear of the hotbar/HUD
 band (never so far that its top leaves the screen).
 
-The same facts go into the inventory's item card, in the same colours. Weapons
-get one summary row that mirrors the loot label — **`T5 · Silver · Long Blade`**
-— and armour a **`T5 · Steel`** Material row (the game's own `Type` still shows
-Plate/Chain/Leather). Gems show their grade (`Gem: Flawless`) and everything
-else a plain `Kind` (Ingredient / Book / Clothing / Misc item). The material is
-always computed from the item, so named/artifact pieces that show no material
-under the name (e.g. *The Last Oath*) still read `T8 · Mithril`; the card's name
-and that row are coloured with the same material palette as the plaque.
+The same facts go into the inventory's item card, in the same colours. The line
+right under the item's name becomes the loot label's summary:
+
+    The Spindle-Blade
+    T6 · Elven · Short Blade
+
+    The Last Oath
+    T8 · Mithril · Plate
+
+Weapons show tier · material · skill, armour tier · material · class (the game's
+own `Type` still shows Plate/Chain/Leather). The material is always computed
+from the item, so named/artifact pieces that show no material of their own
+(e.g. *The Last Oath*) read it here; the name and the line take the same
+material colour as the plaque (overriding the game's rarity colour). Gems show
+their grade as a `Gem` stat (`Flawless`) and everything else a plain `Kind`
+(Ingredient / Book / Clothing / Misc item).
 
 **ESC → Mods → UI Tweaks** has **Tier labels** (off restores the game's plain
 names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
@@ -435,10 +443,10 @@ names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
 3. `assets/propBodies-*.js` — the plaque's row framer (how many of the pile's
    rows are shown at once, and which slice around the selected one) takes its
    row count from the mod instead of the fixed 6.
-4. `assets/enhancedInventory-*.js` — the item card's stat list asks
-   `__dfoUiTweaks.itemFacts(item)` for extra rows (label, value, material slug)
-   and appends them after the game's own `Type`/`Hands`; the card is tagged
-   with `data-dfo-tier` so the stylesheet colours its name too.
+4. `assets/enhancedInventory-*.js` — the card's line under the name asks
+   `__dfoUiTweaks.cardLine(item)` (tier · material · type), its stat list asks
+   `__dfoUiTweaks.itemFacts(item)` for the remaining extra rows, and the card is
+   tagged with `data-dfo-tier` so the stylesheet colours the name and the line.
 5. `assets/dfo-uitweaks.js` — the mod itself (the label/type/material logic,
    the card facts, the settings and the stylesheet).
 

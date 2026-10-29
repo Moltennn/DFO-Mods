@@ -247,11 +247,25 @@ function gemGrade(slug) {
   return { plain: 'Plain', chipped: 'Chipped', flawed: 'Flawed', flawless: 'Flawless', perfect: 'Perfect' }[grade] ?? null;
 }
 
-/** Extra rows for the inventory's item card. Weapons get one summary row that
- *  mirrors the loot label - `T5 . Silver . Long Blade` - and armour a
- *  `T5 . Steel` material row (its class is already the game's "Type"); gems
- *  get their grade and everything else a plain kind. The third element is the
- *  material slug the stylesheet colours the row with. */
+/** The line under the card's name: `T6 . Elven . Long Blade` for weapons,
+ *  `T8 . Mithril . Plate` for armour. Falls back to the game's own meta when
+ *  there is nothing to say. */
+export function cardLine(item) {
+  if (!item || typeof item !== 'object') return null;
+  if (item.group !== 'Weapons' && item.group !== 'Armor') return null;
+  const parts = [];
+  const tier = tierNumber(item);
+  if (tier) parts.push(`T${tier}`);
+  const mat = materialWord(item);
+  if (mat) parts.push(mat);
+  const kind = typeOf(item);
+  if (kind) parts.push(kind);
+  return parts.join(' \u00b7 ') || null;
+}
+
+/** Extra rows for the inventory's item card. Weapons and armour carry their
+ *  tier/material/type in the line under the name (cardLine), so the stats list
+ *  only gains a gem's grade or a plain kind. */
 export function itemFacts(item) {
   if (!item || typeof item !== 'object') return [];
   const slug = materialSlug(item);
@@ -265,23 +279,7 @@ export function itemFacts(item) {
     return rows;
   }
 
-  if (item.group === 'Weapons') {
-    const parts = [];
-    if (tier) parts.push(`T${tier}`);
-    if (mat) parts.push(mat);
-    const skill = typeOf(item);
-    if (skill) parts.push(skill);
-    if (parts.length) rows.push(['Type', parts.join(' \u00b7 '), slug]);
-    return rows;
-  }
-
-  if (item.group === 'Armor') {
-    const parts = [];
-    if (tier) parts.push(`T${tier}`);
-    if (mat) parts.push(mat);
-    if (parts.length) rows.push(['Material', parts.join(' \u00b7 '), slug]);
-    return rows;
-  }
+  if (item.group === 'Weapons' || item.group === 'Armor') return rows;
 
   const group = String(item.group ?? '');
   const kind = /Ingredient/i.test(group) ? 'Ingredient'
@@ -323,7 +321,8 @@ function tierCss() {
 /* the inventory card wears the same material colour as the plaque; the game
  * colours the name by RARITY (aetheric blue, etc.), so override it */
 :root body .card[data-dfo-tier] > h3 { color: var(--dfo-ink, var(--dfo-tier)) !important; text-shadow: 1px 1px 0 #050608 !important; }
-:root body .card .pair[data-dfo-tier] > dd { color: var(--dfo-ink, var(--dfo-tier)) !important; font-weight: 600; }`];
+:root body .card .pair[data-dfo-tier] > dd { color: var(--dfo-ink, var(--dfo-tier)) !important; font-weight: 600; }
+:root body .card[data-dfo-tier] > p.meta { color: var(--dfo-ink, var(--dfo-tier)) !important; }`];
   for (const scheme of SCHEMES) {
     for (const [slug, c] of Object.entries(PALETTES[scheme])) {
       rules.push(`.dfo-uitweaks-scheme-${scheme} .wplaque-row[data-tier="${slug}"], .dfo-uitweaks-scheme-${scheme} [data-dfo-tier="${slug}"] { --dfo-tier: ${c.hex};${c.ink ? ` --dfo-ink: ${c.ink};` : ''} }`);
@@ -496,7 +495,7 @@ export function install() {
   cfg ??= load();
   ensureStyle();
   applyColours();
-  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, tierOf: materialSlug };
+  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, cardLine, tierOf: materialSlug };
   watchPlaque();
   liftTimer ??= setInterval(watchPlaque, 400);
 }

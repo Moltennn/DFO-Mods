@@ -88,6 +88,9 @@ const A_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);';
 const B_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);r.tier!=null&&(i.dataset.tier=String(r.tier));';
 /* the inventory item card's stat list: add our rows right after "Hands" */
 const A_CARD = 'm(`Type`,o.armorType),m(`Hands`,o.hands);';
+/* the line under the card's name (material/stack) - the mod puts the summary there */
+const A_META = 'let d=[o.material,o.stack?`${o.stack} of them`:null].filter(Boolean).join(` · `);d&&l.append(U(`p`,`meta`,d));';
+const B_META = 'let d=globalThis.__dfoUiTweaks?.cardLine?.(e)||[o.material,o.stack?`${o.stack} of them`:null].filter(Boolean).join(` · `);d&&l.append(U(`p`,`meta`,d));';
 const OLD_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts)for(let _f of globalThis.__dfoUiTweaks.itemFacts(e))m(_f[0],_f[1]);';
 const PREV_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts){const _c=p.closest(`.card`),_t=globalThis.__dfoUiTweaks.tierOf?.(e);_c&&_t&&(_c.dataset.dfoTier=_t);for(const _f of globalThis.__dfoUiTweaks.itemFacts(e)){m(_f[0],_f[1]);_f[2]&&p.lastElementChild&&(p.lastElementChild.dataset.dfoTier=_f[2])}}';
 const B_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts){for(const _f of globalThis.__dfoUiTweaks.itemFacts(e)){m(_f[0],_f[1]);_f[2]&&p.lastElementChild&&(p.lastElementChild.dataset.dfoTier=_f[2])}queueMicrotask(()=>{const _c=p.closest(`.card`),_t=globalThis.__dfoUiTweaks.tierOf?.(e);_c&&_t&&(_c.dataset.dfoTier=_t)})}';
@@ -219,7 +222,7 @@ function installNow() {
     // ---- 4. the inventory item card -------------------------------------
     {
       const card = store.findChunk({
-        test: (t) => t.includes(A_CARD) || t.includes('queueMicrotask'),
+        test: (t) => t.includes(A_CARD) || t.includes('cardLine?.(e)'),
       });
       if (!card) deferOrDie('the inventory item card was not found and the bundled build is not readable - start the game, then retry', seed);
       let text = card.text;
@@ -232,8 +235,14 @@ function installNow() {
         text = text.replace(A_CARD, B_CARD);
         log(`  patched ${card.rel} (item card)`);
       }
+      if (text.includes('cardLine?.(e)')) log(`  card meta line already applied (${card.rel})`);
+      else if (text.includes(A_META)) {
+        text = text.replace(A_META, B_META);
+        log(`  patched ${card.rel} (card meta line)`);
+      } else die('the item card meta anchor was not found - aborting (nothing written)');
       store.write(card.rel, Buffer.from(text));
       checks.push({ rel: card.rel, has: 'dataset.dfoTier' });
+      checks.push({ rel: card.rel, has: 'cardLine?.(e)' });
     }
 
     // ---- 5. the mod itself ----------------------------------------------

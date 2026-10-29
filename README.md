@@ -411,6 +411,13 @@ the pane sets 3–20. The plaque hangs below the crosshair and grows downward, s
 a tall list is lifted by just enough to keep its bottom clear of the hotbar/HUD
 band (never so far that its top leaves the screen).
 
+The same facts go into the inventory's item card: after the game's own stats it
+adds **Skill** (the weapon's skill), **Tier** (`T5`), **Gem** (the grade word for
+a stone) or **Kind** (Ingredient / Book / Clothing / Misc item) — so a Saber
+reads `Skill: Long Blade · Tier: T5`, a Flawless Ruby `Gem: Flawless`, and a
+plain Twigs `Kind: Ingredient`. The game's own material word and armour class
+(`Type`) are already in the card, so they are not repeated.
+
 **ESC → Mods → UI Tweaks** has **Tier labels** (off restores the game's plain
 names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
 **List rows**. Settings live in `localStorage['dfoUiTweaks.config.v1']`.
@@ -426,8 +433,11 @@ names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
 3. `assets/propBodies-*.js` — the plaque's row framer (how many of the pile's
    rows are shown at once, and which slice around the selected one) takes its
    row count from the mod instead of the fixed 6.
-4. `assets/dfo-uitweaks.js` — the mod itself (the label/type/material logic,
-   the settings and the stylesheet).
+4. `assets/enhancedInventory-*.js` — the item card's stat list asks
+   `__dfoUiTweaks.itemFacts(item)` for extra rows and appends them after the
+   game's own `Type`/`Hands`.
+5. `assets/dfo-uitweaks.js` — the mod itself (the label/type/material logic,
+   the card facts, the settings and the stylesheet).
 
 The game patches are anchored on the code's shape (the row expression, the
 renderer's `data-rarity` line, the framer's signature and test), not on chunk

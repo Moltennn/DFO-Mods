@@ -230,6 +230,42 @@ export function lootTier(item) {
   return materialSlug(item);
 }
 
+/** Extra rows for the inventory's item card. The game already prints the
+ *  material word under the name and the armour class as "Type", so this adds
+ *  what is missing: the weapon skill, the material tier, a gem's grade and a
+ *  plain kind for everything else. */
+export function itemFacts(item) {
+  if (!item || typeof item !== 'object') return [];
+  const rows = [];
+  if (item.group === 'Weapons') {
+    const skill = typeOf(item);
+    if (skill) rows.push(['Skill', skill]);
+  }
+  const tier = tierNumber(item);
+  if (tier) rows.push(['Tier', `T${tier}`]);
+
+  const gem = materialSlug(item);
+  if (gem && gem.startsWith('gem-')) {
+    const parts = gem.split('-');
+    const grade = parts.length === 3 ? parts[1] : 'plain';
+    const word = { plain: 'Plain', chipped: 'Chipped', flawed: 'Flawed', flawless: 'Flawless', perfect: 'Perfect' }[grade];
+    if (word) rows.push(['Gem', word]);
+  }
+
+  if (!rows.length) {
+    const group = String(item.group ?? '');
+    const kind = /Ingredient/i.test(group) ? 'Ingredient'
+      : /Clothing/i.test(group) ? 'Clothing'
+        : group === 'Books' ? 'Book'
+          : group === 'Jewellery' ? 'Jewellery'
+            : group === 'Gems' ? 'Gem'
+              : group === 'MiscItems' ? 'Misc item'
+                : null;
+    if (kind) rows.push(['Kind', kind]);
+  }
+  return rows;
+}
+
 /* ------------------------------------------------------------------ style */
 function tierCss() {
   const rules = [`
@@ -427,7 +463,7 @@ export function install() {
   cfg ??= load();
   ensureStyle();
   applyColours();
-  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows };
+  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts };
   watchPlaque();
   liftTimer ??= setInterval(watchPlaque, 400);
 }

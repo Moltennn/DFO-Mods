@@ -86,6 +86,10 @@ function deferOrDie(msg, seed) {
 const ROW_RX = /name:([A-Za-z0-9_$]+)\(e\)\.name\|\|`Something`,stack:/;
 const A_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);';
 const B_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);r.tier!=null&&(i.dataset.tier=String(r.tier));';
+/* the inventory item card's stat list: add our rows right after "Hands" */
+const A_CARD = 'm(`Type`,o.armorType),m(`Hands`,o.hands);';
+const B_CARD = `${A_CARD}if(typeof globalThis<\`u\`&&globalThis.__dfoUiTweaks?.itemFacts)for(let _f of globalThis.__dfoUiTweaks.itemFacts(e))m(_f[0],_f[1]);`;
+
 const A_ROWS_FALLBACK = 'function Pf(e,t=-1,n=0,r=6){';
 const ROWS_RX = /function ([A-Za-z0-9_$]+)\(e,t=-1,n=0,r=6\)\{let i=e\?\.rows\?\.length\?\?0;if\(!e\|\|e\.kind!==`items`/;
 const A_FILTER = ',item:e})),r=n.slice(0,t)';
@@ -209,7 +213,24 @@ function installNow() {
       checks.push({ rel: framer.rel, has: 'lootRows?.()' });
     }
 
-    // ---- 4. the mod itself ----------------------------------------------
+    // ---- 4. the inventory item card -------------------------------------
+    {
+      const card = store.findChunk({
+        test: (t) => t.includes(A_CARD) || t.includes('__dfoUiTweaks?.itemFacts'),
+      });
+      if (!card) deferOrDie('the inventory item card was not found and the bundled build is not readable - start the game, then retry', seed);
+      let text = card.text;
+      if (text.includes('__dfoUiTweaks?.itemFacts')) log(`  item card already extended (${card.rel})`);
+      else {
+        if (!text.includes(A_CARD)) die('the inventory item card anchor was not found - aborting (nothing written)');
+        text = text.replace(A_CARD, B_CARD);
+        log(`  patched ${card.rel} (item card)`);
+      }
+      store.write(card.rel, Buffer.from(text));
+      checks.push({ rel: card.rel, has: '__dfoUiTweaks?.itemFacts' });
+    }
+
+    // ---- 5. the mod itself ----------------------------------------------
     const buildId = computeBuild();
     const mod = Buffer.from(fs.readFileSync(MOD_SRC, 'utf8')
       .replace("'@BUILD@'", `'${buildId}'`), 'utf8');
@@ -217,14 +238,14 @@ function installNow() {
     installed.add(MODULE_REL);
     log(`  MOD_BUILD ${buildId}`);
 
-    // ---- 5. register with the loader -------------------------------------
+    // ---- 6. register with the loader -------------------------------------
     upsertRegistry(store, { id: ID, name: NAME, spec: SPEC });
 
-    // ---- 6. one atomic index write, then name an overlay -----------------
+    // ---- 7. one atomic index write, then name an overlay -----------------
     store.commit();
     finalizeOverlay(build);
 
-    // ---- 7. installed.json: loader + this mod's files --------------------
+    // ---- 8. installed.json: loader + this mod's files --------------------
     const marker = readMarker();
     const sameVersion = marker?.version === store.version;
     const next = {

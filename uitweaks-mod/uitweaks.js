@@ -230,39 +230,68 @@ export function lootTier(item) {
   return materialSlug(item);
 }
 
-/** Extra rows for the inventory's item card. The game already prints the
- *  material word under the name and the armour class as "Type", so this adds
- *  what is missing: the weapon skill, the material tier, a gem's grade and a
- *  plain kind for everything else. */
+/** The material word: the metal for weapons/plate, the class for leather and
+ *  chain (the same words the plaque prints). */
+function materialWord(item) {
+  const grade = materialOf(item);
+  if (grade != null) return MATERIALS[grade];
+  if (item.group === 'Armor') {
+    const cls = armorClass(item);
+    if (cls === 'Leather' || cls === 'Chain') return cls;
+  }
+  return null;
+}
+function gemGrade(slug) {
+  const parts = String(slug).split('-');
+  const grade = parts.length === 3 ? parts[1] : 'plain';
+  return { plain: 'Plain', chipped: 'Chipped', flawed: 'Flawed', flawless: 'Flawless', perfect: 'Perfect' }[grade] ?? null;
+}
+
+/** Extra rows for the inventory's item card. Weapons get one summary row that
+ *  mirrors the loot label - `T5 . Silver . Long Blade` - and armour a
+ *  `T5 . Steel` material row (its class is already the game's "Type"); gems
+ *  get their grade and everything else a plain kind. The third element is the
+ *  material slug the stylesheet colours the row with. */
 export function itemFacts(item) {
   if (!item || typeof item !== 'object') return [];
-  const rows = [];
-  if (item.group === 'Weapons') {
-    const skill = typeOf(item);
-    if (skill) rows.push(['Skill', skill]);
-  }
+  const slug = materialSlug(item);
   const tier = tierNumber(item);
-  if (tier) rows.push(['Tier', `T${tier}`]);
+  const mat = materialWord(item);
+  const rows = [];
 
-  const gem = materialSlug(item);
-  if (gem && gem.startsWith('gem-')) {
-    const parts = gem.split('-');
-    const grade = parts.length === 3 ? parts[1] : 'plain';
-    const word = { plain: 'Plain', chipped: 'Chipped', flawed: 'Flawed', flawless: 'Flawless', perfect: 'Perfect' }[grade];
-    if (word) rows.push(['Gem', word]);
+  if (slug && slug.startsWith('gem-')) {
+    const word = gemGrade(slug);
+    if (word) rows.push(['Gem', word, slug]);
+    return rows;
   }
 
-  if (!rows.length) {
-    const group = String(item.group ?? '');
-    const kind = /Ingredient/i.test(group) ? 'Ingredient'
-      : /Clothing/i.test(group) ? 'Clothing'
-        : group === 'Books' ? 'Book'
-          : group === 'Jewellery' ? 'Jewellery'
-            : group === 'Gems' ? 'Gem'
-              : group === 'MiscItems' ? 'Misc item'
-                : null;
-    if (kind) rows.push(['Kind', kind]);
+  if (item.group === 'Weapons') {
+    const parts = [];
+    if (tier) parts.push(`T${tier}`);
+    if (mat) parts.push(mat);
+    const skill = typeOf(item);
+    if (skill) parts.push(skill);
+    if (parts.length) rows.push(['Type', parts.join(' \u00b7 '), slug]);
+    return rows;
   }
+
+  if (item.group === 'Armor') {
+    const parts = [];
+    if (tier) parts.push(`T${tier}`);
+    if (mat) parts.push(mat);
+    if (parts.length) rows.push(['Material', parts.join(' \u00b7 '), slug]);
+    return rows;
+  }
+
+  const group = String(item.group ?? '');
+  const kind = /Ingredient/i.test(group) ? 'Ingredient'
+    : /Clothing/i.test(group) ? 'Clothing'
+      : group === 'Books' ? 'Book'
+        : group === 'Jewellery' ? 'Jewellery'
+          : group === 'Gems' ? 'Gem'
+            : group === 'MiscItems' ? 'Misc item'
+              : null;
+  if (kind) rows.push(['Kind', kind, null]);
   return rows;
 }
 
@@ -290,20 +319,24 @@ function tierCss() {
 }
 .dfo-uitweaks-colours .wplaque-list .wplaque-row[data-tier].sel > span:first-child { text-shadow: 0 0 8px color-mix(in srgb, var(--dfo-tier) 45%, transparent); }
 /* gems carry their colour in the name only - no dot in front of the stone */
-:root .wplaque-list .wplaque-row[data-tier^="gem-"] > span:first-child::before { content: none !important; }`];
+:root .wplaque-list .wplaque-row[data-tier^="gem-"] > span:first-child::before { content: none !important; }
+/* the inventory card wears the same material colour as the plaque; the game
+ * colours the name by RARITY (aetheric blue, etc.), so override it */
+:root body .card[data-dfo-tier] > h3 { color: var(--dfo-ink, var(--dfo-tier)) !important; text-shadow: 1px 1px 0 #050608 !important; }
+:root body .card .pair[data-dfo-tier] > dd { color: var(--dfo-ink, var(--dfo-tier)) !important; font-weight: 600; }`];
   for (const scheme of SCHEMES) {
     for (const [slug, c] of Object.entries(PALETTES[scheme])) {
-      rules.push(`.dfo-uitweaks-scheme-${scheme} .wplaque-row[data-tier="${slug}"] { --dfo-tier: ${c.hex};${c.ink ? ` --dfo-ink: ${c.ink};` : ''} }`);
+      rules.push(`.dfo-uitweaks-scheme-${scheme} .wplaque-row[data-tier="${slug}"], .dfo-uitweaks-scheme-${scheme} [data-dfo-tier="${slug}"] { --dfo-tier: ${c.hex};${c.ink ? ` --dfo-ink: ${c.ink};` : ''} }`);
     }
   }
   /* gems keep their own colour under every palette; the dot carries the grade */
   for (const [slug, hex] of Object.values(GEMS)) {
-    rules.push(`.wplaque-row[data-tier="gem-${slug}"] { --dfo-tier: ${hex}; --dfo-ink: ${hex}; }`);
+    rules.push(`.wplaque-row[data-tier="gem-${slug}"], [data-dfo-tier="gem-${slug}"] { --dfo-tier: ${hex}; --dfo-ink: ${hex}; }`);
   }
   for (const grade of GEM_GRADES) {
     for (const [at, stone] of GEM_STONES.entries()) {
       const hex = GEMS[at][1];
-      rules.push(`.wplaque-row[data-tier="gem-${grade}-${stone}"] { --dfo-tier: ${hex}; --dfo-ink: ${hex}; }`);
+      rules.push(`.wplaque-row[data-tier="gem-${grade}-${stone}"], [data-dfo-tier="gem-${grade}-${stone}"] { --dfo-tier: ${hex}; --dfo-ink: ${hex}; }`);
     }
   }
   return rules.join('\n');
@@ -463,7 +496,7 @@ export function install() {
   cfg ??= load();
   ensureStyle();
   applyColours();
-  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts };
+  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, tierOf: materialSlug };
   watchPlaque();
   liftTimer ??= setInterval(watchPlaque, 400);
 }

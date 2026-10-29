@@ -411,12 +411,14 @@ the pane sets 3–20. The plaque hangs below the crosshair and grows downward, s
 a tall list is lifted by just enough to keep its bottom clear of the hotbar/HUD
 band (never so far that its top leaves the screen).
 
-The same facts go into the inventory's item card: after the game's own stats it
-adds **Skill** (the weapon's skill), **Tier** (`T5`), **Gem** (the grade word for
-a stone) or **Kind** (Ingredient / Book / Clothing / Misc item) — so a Saber
-reads `Skill: Long Blade · Tier: T5`, a Flawless Ruby `Gem: Flawless`, and a
-plain Twigs `Kind: Ingredient`. The game's own material word and armour class
-(`Type`) are already in the card, so they are not repeated.
+The same facts go into the inventory's item card, in the same colours. Weapons
+get one summary row that mirrors the loot label — **`T5 · Silver · Long Blade`**
+— and armour a **`T5 · Steel`** Material row (the game's own `Type` still shows
+Plate/Chain/Leather). Gems show their grade (`Gem: Flawless`) and everything
+else a plain `Kind` (Ingredient / Book / Clothing / Misc item). The material is
+always computed from the item, so named/artifact pieces that show no material
+under the name (e.g. *The Last Oath*) still read `T8 · Mithril`; the card's name
+and that row are coloured with the same material palette as the plaque.
 
 **ESC → Mods → UI Tweaks** has **Tier labels** (off restores the game's plain
 names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
@@ -434,8 +436,9 @@ names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
    rows are shown at once, and which slice around the selected one) takes its
    row count from the mod instead of the fixed 6.
 4. `assets/enhancedInventory-*.js` — the item card's stat list asks
-   `__dfoUiTweaks.itemFacts(item)` for extra rows and appends them after the
-   game's own `Type`/`Hands`.
+   `__dfoUiTweaks.itemFacts(item)` for extra rows (label, value, material slug)
+   and appends them after the game's own `Type`/`Hands`; the card is tagged
+   with `data-dfo-tier` so the stylesheet colours its name too.
 5. `assets/dfo-uitweaks.js` — the mod itself (the label/type/material logic,
    the card facts, the settings and the stylesheet).
 

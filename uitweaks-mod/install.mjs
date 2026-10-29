@@ -88,7 +88,10 @@ const A_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);';
 const B_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);r.tier!=null&&(i.dataset.tier=String(r.tier));';
 /* the inventory item card's stat list: add our rows right after "Hands" */
 const A_CARD = 'm(`Type`,o.armorType),m(`Hands`,o.hands);';
-const B_CARD = `${A_CARD}if(typeof globalThis<\`u\`&&globalThis.__dfoUiTweaks?.itemFacts)for(let _f of globalThis.__dfoUiTweaks.itemFacts(e))m(_f[0],_f[1]);`;
+const OLD_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts)for(let _f of globalThis.__dfoUiTweaks.itemFacts(e))m(_f[0],_f[1]);';
+const PREV_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts){const _c=p.closest(`.card`),_t=globalThis.__dfoUiTweaks.tierOf?.(e);_c&&_t&&(_c.dataset.dfoTier=_t);for(const _f of globalThis.__dfoUiTweaks.itemFacts(e)){m(_f[0],_f[1]);_f[2]&&p.lastElementChild&&(p.lastElementChild.dataset.dfoTier=_f[2])}}';
+const B_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts){for(const _f of globalThis.__dfoUiTweaks.itemFacts(e)){m(_f[0],_f[1]);_f[2]&&p.lastElementChild&&(p.lastElementChild.dataset.dfoTier=_f[2])}queueMicrotask(()=>{const _c=p.closest(`.card`),_t=globalThis.__dfoUiTweaks.tierOf?.(e);_c&&_t&&(_c.dataset.dfoTier=_t)})}';
+const B_CARD = A_CARD + B_FACTS;
 
 const A_ROWS_FALLBACK = 'function Pf(e,t=-1,n=0,r=6){';
 const ROWS_RX = /function ([A-Za-z0-9_$]+)\(e,t=-1,n=0,r=6\)\{let i=e\?\.rows\?\.length\?\?0;if\(!e\|\|e\.kind!==`items`/;
@@ -216,18 +219,21 @@ function installNow() {
     // ---- 4. the inventory item card -------------------------------------
     {
       const card = store.findChunk({
-        test: (t) => t.includes(A_CARD) || t.includes('__dfoUiTweaks?.itemFacts'),
+        test: (t) => t.includes(A_CARD) || t.includes('queueMicrotask'),
       });
       if (!card) deferOrDie('the inventory item card was not found and the bundled build is not readable - start the game, then retry', seed);
       let text = card.text;
-      if (text.includes('__dfoUiTweaks?.itemFacts')) log(`  item card already extended (${card.rel})`);
-      else {
+      if (text.includes('queueMicrotask')) log(`  item card already extended (${card.rel})`);
+      else if (text.includes(PREV_FACTS) || text.includes(OLD_FACTS)) {
+        text = text.replace(PREV_FACTS, B_FACTS).replace(OLD_FACTS, B_FACTS);
+        log(`  upgraded ${card.rel} (item card)`);
+      } else {
         if (!text.includes(A_CARD)) die('the inventory item card anchor was not found - aborting (nothing written)');
         text = text.replace(A_CARD, B_CARD);
         log(`  patched ${card.rel} (item card)`);
       }
       store.write(card.rel, Buffer.from(text));
-      checks.push({ rel: card.rel, has: '__dfoUiTweaks?.itemFacts' });
+      checks.push({ rel: card.rel, has: 'dataset.dfoTier' });
     }
 
     // ---- 5. the mod itself ----------------------------------------------

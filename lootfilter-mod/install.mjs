@@ -97,6 +97,19 @@ function exposePileManager(text) {
   return { text: out, changed: true };
 }
 
+/* The foe manager draws dead foes as corpses and owns their loot. Expose it so
+ * the mod can hide a corpse whose items are all filtered. */
+function exposeFoeManager(text) {
+  if (text.includes('__dfoFoes=')) return { text, changed: false };
+  const A = '=pLe({oneVoice:';
+  if (!text.includes(A)) return { text, missing: true };
+  return { text: text.replace(A, '=globalThis.__dfoFoes=pLe({oneVoice:'), changed: true };
+}
+
+/* The corpse body is drawn by the foe renderer: a dead foe with a corpse is
+ * "stood" as a foe body. Skip that draw when the filter hides the whole body. */
+const CORPSE_RX = /([A-Za-z0-9_$]+)\.dead&&\1\.corpse&&!\1\.corpseDestroyed&&/;
+
 /* ------------------------------------------------------- the row hook */
 /* The row builder's item name is the one stable shape (`name:<fn>(e).name||
  * `Something``); the helper is renamed every build. */
@@ -166,10 +179,18 @@ function installNow() {
       });
       if (!world) deferOrDie('the world chunk was not found and the bundled build is not readable - start the game, then retry', seed);
       const exposed = exposePileManager(world.text);
-      if (exposed.changed) { store.write(world.rel, Buffer.from(exposed.text)); log(`  patched ${world.rel} (pile manager exposed)`); }
-      else if (exposed.missing) die('the dropped-pile manager was not found - aborting (nothing written)');
+      if (exposed.missing) die('the dropped-pile manager was not found - aborting (nothing written)');
+      let text = exposed.text;
+      if (exposed.changed) log(`  patched ${world.rel} (pile manager exposed)`);
       else log(`  pile manager already exposed (${world.rel})`);
+      const foes = exposeFoeManager(text);
+      if (foes.missing) die('the foe manager was not found - aborting (nothing written)');
+      text = foes.text;
+      if (foes.changed) log(`  patched ${world.rel} (foe manager exposed)`);
+      else log(`  foe manager already exposed (${world.rel})`);
+      if (exposed.changed || foes.changed) store.write(world.rel, Buffer.from(text));
       checks.push({ rel: world.rel, has: '__dfoPiles=' });
+      checks.push({ rel: world.rel, has: '__dfoFoes=' });
     }
 
     // ---- 2. the row-filter hook in the plaque's row builder -------------
@@ -186,7 +207,23 @@ function installNow() {
       checks.push({ rel: rows.rel, has: ROW_HOOK });
     }
 
-    // ---- 3. the mod itself ----------------------------------------------
+    // ---- 3. the corpse body draw ----------------------------------------
+    {
+      const bodies = store.findChunk({ test: (t) => t.includes('hideCorpse') || CORPSE_RX.test(t) });
+      if (!bodies) deferOrDie('the foe-body renderer was not found and the bundled build is not readable - start the game, then retry', seed);
+      let text = bodies.text;
+      if (text.includes('hideCorpse')) log(`  corpse body guard already applied (${bodies.rel})`);
+      else {
+        const m = text.match(CORPSE_RX);
+        if (!m) die('the corpse body draw anchor was not found - aborting (nothing written)');
+        text = text.replace(CORPSE_RX, `${m[1]}.dead&&${m[1]}.corpse&&!${m[1]}.corpseDestroyed&&!(globalThis.__dfoRowFilter?.hideCorpse?.(${m[1]}))&&`);
+        log(`  patched ${bodies.rel} (corpse body draw)`);
+      }
+      store.write(bodies.rel, Buffer.from(text));
+      checks.push({ rel: bodies.rel, has: 'hideCorpse' });
+    }
+
+    // ---- 4. the mod itself ----------------------------------------------
     const buildId = computeBuild();
     const mod = Buffer.from(fs.readFileSync(MOD_SRC, 'utf8')
       .replace("'@BUILD@'", `'${buildId}'`), 'utf8');
@@ -194,14 +231,14 @@ function installNow() {
     installed.add(MODULE_REL);
     log(`  MOD_BUILD ${buildId}`);
 
-    // ---- 4. register with the loader -------------------------------------
+    // ---- 5. register with the loader -------------------------------------
     upsertRegistry(store, { id: ID, name: NAME, spec: SPEC });
 
-    // ---- 5. one atomic index write, then name an overlay -----------------
+    // ---- 6. one atomic index write, then name an overlay -----------------
     store.commit();
     finalizeOverlay(build);
 
-    // ---- 6. installed.json: loader + this mod's file ---------------------
+    // ---- 7. installed.json: loader + this mod's file ---------------------
     const marker = readMarker();
     const sameVersion = marker?.version === store.version;
     const next = {

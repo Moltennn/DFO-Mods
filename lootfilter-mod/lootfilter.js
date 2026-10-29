@@ -146,7 +146,24 @@ function allFiltered(items) {
   if (!cfg?.on || !Array.isArray(items) || !items.length) return false;
   return items.every((item) => !keep(item));
 }
+/* Corpses are dead foes; their loot target and hover name hang off
+ * `corpseDisabled`, so a fully filtered body stops being offered (the item
+ * model then hides its plaque as usual). */
+function syncCorpses() {
+  const foes = globalThis.__dfoFoes?.foes;
+  if (!Array.isArray(foes)) return;
+  for (const foe of foes) {
+    if (!foe || !foe.dead || !foe.corpse) continue;
+    const items = foe.entity?.items;
+    if (!Array.isArray(items) || !items.length) continue;
+    const hide = allFiltered(items);
+    if (hide && !foe.corpseDisabled) { foe.corpseDisabled = true; foe._dfoHidden = true; }
+    else if (!hide && foe._dfoHidden) { foe.corpseDisabled = false; foe._dfoHidden = false; }
+  }
+}
+
 function syncPiles() {
+  syncCorpses();
   const piles = globalThis.__dfoPiles?._piles;
   if (!Array.isArray(piles)) return;
   for (const pile of piles) {
@@ -163,6 +180,13 @@ function syncPiles() {
       hiddenByUs.delete(pile);
     }
   }
+}
+
+/** The renderer asks this before standing a dead foe's body. */
+export function hideCorpse(foe) {
+  if (!cfg?.on || !foe?.dead) return false;
+  const items = foe.entity?.items;
+  return Array.isArray(items) && items.length > 0 && items.every((item) => !keep(item));
 }
 
 /* ---------------------------------------------------------------- config */
@@ -284,7 +308,7 @@ function buildPane(container) {
 /* -------------------------------------------------------------- lifecycle */
 export function install() {
   cfg ??= load();
-  globalThis.__dfoRowFilter = { keep };
+  globalThis.__dfoRowFilter = { keep, hideCorpse };
   syncPiles();
   pileTimer ??= setInterval(syncPiles, 700);
 }
@@ -295,6 +319,9 @@ export function unmount() {
   const piles = globalThis.__dfoPiles?._piles;
   if (Array.isArray(piles)) {
     for (const pile of piles) if (pile && hiddenByUs.has(pile)) { pile.inactive = false; hiddenByUs.delete(pile); }
+  }
+  for (const foe of globalThis.__dfoFoes?.foes ?? []) {
+    if (foe?._dfoHidden) { foe._dfoHidden = false; foe.corpseDisabled = false; }
   }
 }
 

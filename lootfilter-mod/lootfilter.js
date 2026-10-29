@@ -133,6 +133,38 @@ export function keep(item) {
   return true;
 }
 
+/* ------------------------------------------------------------ pile sprites */
+/* The dropped-loot manager (exposed as __dfoPiles by the installer) draws the
+ * 3-D pile of items on the ground. A pile whose items are all filtered is put
+ * to sleep (`inactive`), which the manager skips when it frames the piles, and
+ * woken again when the filter lets something through. The items themselves are
+ * untouched. */
+let pileTimer = null;
+const hiddenByUs = new WeakSet();
+
+function allFiltered(items) {
+  if (!cfg?.on || !Array.isArray(items) || !items.length) return false;
+  return items.every((item) => !keep(item));
+}
+function syncPiles() {
+  const piles = globalThis.__dfoPiles?._piles;
+  if (!Array.isArray(piles)) return;
+  for (const pile of piles) {
+    if (!pile || pile.dead) continue;
+    const items = pile.items;
+    if (!Array.isArray(items) || !items.length) continue;
+    const hide = allFiltered(items);
+    if (hide && !pile.inactive) {
+      pile.inactive = true;
+      hiddenByUs.add(pile);
+    } else if (!hide && pile.inactive) {
+      /* wake anything the filter put to sleep (or a save left asleep) */
+      pile.inactive = false;
+      hiddenByUs.delete(pile);
+    }
+  }
+}
+
 /* ---------------------------------------------------------------- config */
 function buildPane(container) {
   container.textContent = '';
@@ -253,10 +285,17 @@ function buildPane(container) {
 export function install() {
   cfg ??= load();
   globalThis.__dfoRowFilter = { keep };
+  syncPiles();
+  pileTimer ??= setInterval(syncPiles, 700);
 }
 
 export function unmount() {
   if (globalThis.__dfoRowFilter?.keep === keep) delete globalThis.__dfoRowFilter;
+  if (pileTimer) { clearInterval(pileTimer); pileTimer = null; }
+  const piles = globalThis.__dfoPiles?._piles;
+  if (Array.isArray(piles)) {
+    for (const pile of piles) if (pile && hiddenByUs.has(pile)) { pile.inactive = false; hiddenByUs.delete(pile); }
+  }
 }
 
 export function mountPane(container) {

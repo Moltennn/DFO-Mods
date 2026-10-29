@@ -445,7 +445,10 @@ names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
    row count from the mod instead of the fixed 6, and the item-model builders
    return nothing when the filter removed every row of a non-empty pile (the
    plaque disappears instead of showing just its title).
-4. `assets/enhancedInventory-*.js` — the card's line under the name asks
+4. `assets/world-*.js` — exposes the dropped-pile manager as `__dfoPiles` so the
+   mod can put a fully filtered pile to sleep (`inactive`), hiding its sprite and
+   its plaque; the items stay in the pile.
+5. `assets/enhancedInventory-*.js` — the card's line under the name asks
    `__dfoUiTweaks.cardLine(item)` (tier · material · type), its stat list asks
    `__dfoUiTweaks.itemFacts(item)` for the remaining extra rows, and the card is
    tagged with `data-dfo-tier` so the stylesheet colours the name and the line.
@@ -484,8 +487,11 @@ plaque refreshes (look away and back).
 
 A pile is hidden **as a whole**: if every item in it is filtered out and the
 pile was not actually empty, the plaque does not appear at all (no title with an
-empty list). The drop stays in the world and Take all still sees it — the filter
-only decides what the plaque shows.
+empty list) and the **3-D pile of items on the ground is hidden too**. The drop
+is only put to sleep (`inactive` on the dropped-pile manager), never deleted:
+its items are untouched, and it wakes up — sprite, plaque and all — as soon as
+the filter lets one of them through or is turned off. While hidden it is out of
+reach (no plaque, not in Take all), which is the point of hiding it.
 
 **ESC → Mods → Loot Filter** holds the rules; settings live in
 `localStorage['dfoLootFilter.config.v1']`.

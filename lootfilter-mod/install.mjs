@@ -79,6 +79,24 @@ function deferOrDie(msg, seed) {
   die(msg);
 }
 
+/* --------------------------------------------------- the pile manager */
+/* The dropped-loot manager owns the 3-D pile sprites. Expose it so the mod can
+ * hide a pile whose items are all filtered. The manager is the one created with
+ * `{renderer, getTexture, uploadRecordFrame}` and later used with
+ * `.restoreWorld(` / `.seedPile(`; the names are minified per build. */
+function exposePileManager(text) {
+  if (text.includes('__dfoPiles=')) return { text, changed: false };
+  const RX = /let ([A-Za-z0-9_$]+)=([A-Za-z0-9_$]+)\(\{renderer:[A-Za-z0-9_$]+,getTexture:[A-Za-z0-9_$]+,uploadRecordFrame:[A-Za-z0-9_$]+\}\)/g;
+  let m = null;
+  let hit = null;
+  while ((m = RX.exec(text))) {
+    if (text.includes(`${m[1]}.restoreWorld(`) || text.includes(`${m[1]}.seedPile(`)) { hit = m; break; }
+  }
+  if (!hit) return { text, missing: true };
+  const out = `${text.slice(0, hit.index)}let ${hit[1]}=globalThis.__dfoPiles=${hit[2]}(${text.slice(hit.index + hit[0].indexOf('({') + 1)}`;
+  return { text: out, changed: true };
+}
+
 /* ------------------------------------------------------- the row hook */
 /* The row builder's item name is the one stable shape (`name:<fn>(e).name||
  * `Something``); the helper is renamed every build. */
@@ -140,7 +158,21 @@ function installNow() {
     const installed = new Set();
     const checks = [];
 
-    // ---- 1. the row-filter hook in the plaque's row builder -------------
+    // ---- 1. expose the dropped-pile manager (3-D pile sprites) ----------
+    {
+      const world = store.findChunk({
+        test: (t) => t.includes('__dfoPiles=')
+          || (t.includes('uploadRecordFrame:') && t.includes('.restoreWorld(') && t.includes('.seedPile(')),
+      });
+      if (!world) deferOrDie('the world chunk was not found and the bundled build is not readable - start the game, then retry', seed);
+      const exposed = exposePileManager(world.text);
+      if (exposed.changed) { store.write(world.rel, Buffer.from(exposed.text)); log(`  patched ${world.rel} (pile manager exposed)`); }
+      else if (exposed.missing) die('the dropped-pile manager was not found - aborting (nothing written)');
+      else log(`  pile manager already exposed (${world.rel})`);
+      checks.push({ rel: world.rel, has: '__dfoPiles=' });
+    }
+
+    // ---- 2. the row-filter hook in the plaque's row builder -------------
     {
       const rows = store.findChunk({
         test: (t) => ROW_RX.test(t) || t.includes('lootLabel') || t.includes(ROW_HOOK),
@@ -154,7 +186,7 @@ function installNow() {
       checks.push({ rel: rows.rel, has: ROW_HOOK });
     }
 
-    // ---- 2. the mod itself ----------------------------------------------
+    // ---- 3. the mod itself ----------------------------------------------
     const buildId = computeBuild();
     const mod = Buffer.from(fs.readFileSync(MOD_SRC, 'utf8')
       .replace("'@BUILD@'", `'${buildId}'`), 'utf8');
@@ -162,14 +194,14 @@ function installNow() {
     installed.add(MODULE_REL);
     log(`  MOD_BUILD ${buildId}`);
 
-    // ---- 3. register with the loader -------------------------------------
+    // ---- 4. register with the loader -------------------------------------
     upsertRegistry(store, { id: ID, name: NAME, spec: SPEC });
 
-    // ---- 4. one atomic index write, then name an overlay -----------------
+    // ---- 5. one atomic index write, then name an overlay -----------------
     store.commit();
     finalizeOverlay(build);
 
-    // ---- 5. installed.json: loader + this mod's file ---------------------
+    // ---- 6. installed.json: loader + this mod's file ---------------------
     const marker = readMarker();
     const sameVersion = marker?.version === store.version;
     const next = {

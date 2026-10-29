@@ -442,7 +442,9 @@ names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
    row as `data-tier`; the mod's stylesheet keys the colours off it.
 3. `assets/propBodies-*.js` — the plaque's row framer (how many of the pile's
    rows are shown at once, and which slice around the selected one) takes its
-   row count from the mod instead of the fixed 6.
+   row count from the mod instead of the fixed 6, and the item-model builders
+   return nothing when the filter removed every row of a non-empty pile (the
+   plaque disappears instead of showing just its title).
 4. `assets/enhancedInventory-*.js` — the card's line under the name asks
    `__dfoUiTweaks.cardLine(item)` (tier · material · type), its stat list asks
    `__dfoUiTweaks.itemFacts(item)` for the remaining extra rows, and the card is
@@ -479,6 +481,11 @@ never hidden. Rules combine as "hide if any matches":
 Gems have no material tier, so the tier rules leave them alone — use the type
 switch or the name list for stones. Filter changes apply the next time the
 plaque refreshes (look away and back).
+
+A pile is hidden **as a whole**: if every item in it is filtered out and the
+pile was not actually empty, the plaque does not appear at all (no title with an
+empty list). The drop stays in the world and Take all still sees it — the filter
+only decides what the plaque shows.
 
 **ESC → Mods → Loot Filter** holds the rules; settings live in
 `localStorage['dfoLootFilter.config.v1']`.

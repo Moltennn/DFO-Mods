@@ -104,6 +104,36 @@ const A_FILTER = ',item:e})),r=n.slice(0,t)';
 const ROW_HOOK = 'globalThis.__dfoRowFilter?.keep?.(e.item)??true';
 const OLD_HOOK_RX = /\.filter\(e=>globalThis\.__dfoUiTweaks\?\.keepLoot\?\.\(e\.item\)\?\?true\)/;
 
+/* ---- "hide the pile as a whole" --------------------------------------------
+ * The row builder filters rows; when it removed every item of a pile the model
+ * ends up with no rows but is not "empty", and the plaque still appears with
+ * just its title. Make `empty` mean "the pile was born empty", and let the two
+ * item-model builders return null (no plaque) when the filter ate everything.
+ */
+const BUILDER_RX = /function ([A-Za-z0-9_$]+)\(e,t=6\)\{let n=([A-Za-z0-9_$]+)\(e\)\.map/;
+const A_EMPTY = 'return{shown:r,rest:n.length-r.length,empty:n.length===0}';
+
+function guardEmptyPiles(text) {
+  const head = text.match(BUILDER_RX);
+  if (!head) return { text, missing: true };
+  const [, builder, arrFn] = head;
+  let out = text;
+  if (!out.includes(`${arrFn}(e).length===0`)) {
+    if (!out.includes(A_EMPTY)) return { text, missing: true };
+    out = out.replace(A_EMPTY, `return{shown:r,rest:n.length-r.length,empty:${arrFn}(e).length===0}`);
+  }
+  const RX = new RegExp(`let\\{shown:([A-Za-z0-9_$]+),rest:([A-Za-z0-9_$]+),empty:([A-Za-z0-9_$]+)\\}=${builder}\\(([^;]{1,90}?),1\\/0\\)([,;])`, 'g');
+  let guards = 0;
+  out = out.replace(RX, (all, shown, rest, empty, args, sep) => {
+    guards++;
+    const guard = `;if(!${shown}.length&&!${empty})return null;`;
+    return sep === ','
+      ? `let{shown:${shown},rest:${rest},empty:${empty}}=${builder}(${args},1/0)${guard}let `
+      : `let{shown:${shown},rest:${rest},empty:${empty}}=${builder}(${args},1/0)${guard}`;
+  });
+  return { text: out, guards, missing: guards === 0 };
+}
+
 function ensureRowFilter(text) {
   if (text.includes(ROW_HOOK)) return { text, changed: false };
   if (OLD_HOOK_RX.test(text)) return { text: text.replace(OLD_HOOK_RX, `.filter(e=>${ROW_HOOK})`), changed: true };
@@ -178,8 +208,16 @@ function installNow() {
       if (hook.changed) log(`  patched ${rows.rel} (row filter hook)`);
       else log(`  row filter hook already present (${rows.rel})`);
       text = hook.text;
+      if (text.includes(',1/0);if(!')) log(`  empty-pile guard already applied (${rows.rel})`);
+      else {
+        const guarded = guardEmptyPiles(text);
+        if (guarded.missing) die('the plaque model builders were not found - aborting (nothing written)');
+        text = guarded.text;
+        log(`  patched ${rows.rel} (empty piles hidden, ${guarded.guards} site${guarded.guards === 1 ? '' : 's'})`);
+      }
       store.write(rows.rel, Buffer.from(text));
       checks.push({ rel: rows.rel, has: 'lootLabel' });
+      checks.push({ rel: rows.rel, has: 'return null;' });
     }
 
     // ---- 2. the plaque renderer: carry the tier to the DOM ---------------

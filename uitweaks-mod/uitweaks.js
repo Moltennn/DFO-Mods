@@ -124,11 +124,10 @@ function load() {
         colours: raw.colours !== false,
         scheme,
         rows: clampRows(raw.rows),
-        filter: loadFilter(raw.filter),
       };
     }
   } catch { /* unreadable - defaults */ }
-  return { labels: true, colours: true, scheme: 'classic', rows: ROWS_DEFAULT, filter: loadFilter(null) };
+  return { labels: true, colours: true, scheme: 'classic', rows: ROWS_DEFAULT };
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch { /* private mode */ }
@@ -136,89 +135,6 @@ function save() {
 
 /* Ammo is not material-graded: pellets and arrows keep their plain name. */
 const AMMO = /(?:^|\s)(pellets?|arrows?|bolts?)$/i;
-
-/* ------------------------------------------------------------ loot filter */
-/* Player-defined junk: every rule is optional and combines as "hide if it
- * matches any". Nothing is deleted - the row simply never reaches the plaque,
- * and Take all still sweeps the whole pile. */
-const FILTER_TYPES = ['weapons', 'armor', 'gems', 'clothing', 'ingredients', 'misc', 'books', 'ammo'];
-const RARITY_RANK = { common: 0, magic: 1, rare: 2, legendary: 3, artifact: 4, aetheric: 5, gilded: 5 };
-
-function loadFilter(raw) {
-  const f = raw && typeof raw === 'object' ? raw : {};
-  const hide = {};
-  for (const key of FILTER_TYPES) hide[key] = f.hide?.[key] === true;
-  return {
-    on: f.on === true,
-    hide,
-    hideCommon: f.hideCommon === true,
-    commonTier: Math.max(0, Math.min(12, Math.trunc(Number(f.commonTier) || 0))),
-    anyTier: Math.max(0, Math.min(12, Math.trunc(Number(f.anyTier) || 0))),
-    minRarity: Math.max(0, Math.min(5, Math.trunc(Number(f.minRarity) || 0))),
-    minValue: Math.max(0, Math.trunc(Number(f.minValue) || 0)),
-    hideNames: String(f.hideNames ?? ''),
-    keepNames: String(f.keepNames ?? ''),
-  };
-}
-
-function parseList(text) {
-  return String(text ?? '').split(',').map((s) => norm(s)).filter(Boolean);
-}
-function listHas(list, name) {
-  for (const term of parseList(list)) if (name.includes(term)) return true;
-  return false;
-}
-
-/** Which of the pane's type switches this item answers to. */
-function categoryOf(item) {
-  if (!item) return 'misc';
-  if (AMMO.test(String(item.name ?? ''))) return 'ammo';
-  if (gemSlug(item)) return 'gems';
-  const group = String(item.group ?? '');
-  if (/Clothing/i.test(group)) return 'clothing';
-  if (/Ingredient/i.test(group)) return 'ingredients';
-  if (group === 'Weapons') return 'weapons';
-  if (group === 'Armor') return 'armor';
-  if (group === 'Books') return 'books';
-  return 'misc';
-}
-
-/** The game's rarity word for an item (common when it has none). */
-function rarityWord(item) {
-  if (!item) return 'common';
-  if (item.artifact) return 'artifact';
-  if (typeof item.rarity === 'string' && RARITY_RANK[item.rarity] != null) return item.rarity;
-  if (item.aetheric) return 'aetheric';
-  if (item.gilded) return 'gilded';
-  if (item.magic || item.enchantmentPoints > 0 || item.enchant) return 'magic';
-  return 'common';
-}
-
-/** The plaque row filter. Called by the game for every item in a pile. */
-export function keepLoot(item) {
-  const f = cfg?.filter;
-  if (!f?.on || !item || typeof item !== 'object') return true;
-  if (item.questItem) return true; // quest items are never junk
-
-  const name = norm(item.name);
-  if (listHas(f.keepNames, name)) return true;
-  if (listHas(f.hideNames, name)) return false;
-  if (f.hide?.[categoryOf(item)]) return false;
-
-  const rank = RARITY_RANK[rarityWord(item)] ?? 0;
-  if (f.minRarity > 0 && rank < f.minRarity) return false;
-  if (f.hideCommon && rank === 0) return false;
-
-  const tier = tierNumber(item); // null for gems / ungraded things
-  if (tier != null) {
-    if (f.anyTier > 0 && tier < f.anyTier) return false;
-    if (f.commonTier > 0 && rank === 0 && tier < f.commonTier) return false;
-  }
-  if (f.minValue > 0 && (Number(item.value) || 0) < f.minValue) return false;
-  return true;
-}
-
-
 
 /** How many item rows the plaque shows at once (the game hard-caps at 6;
  *  the installer makes its row framer ask this instead). */
@@ -471,67 +387,6 @@ function buildPane(container) {
 
   number('List rows', ROWS_MIN, ROWS_MAX, () => clampRows(cfg.rows), (v) => { cfg.rows = v; save(); });
 
-  /* ---- loot filter ---------------------------------------------------- */
-  heading('Loot filter');
-  const f = cfg.filter;
-  const noteFilter = document.createElement('div');
-  noteFilter.style.cssText = 'color:var(--dim,#b9b2a1);font-size:12px;margin:2px 0 4px';
-  noteFilter.textContent = 'Hides rows from the loot list only; Take all still takes everything. Applies the next time the plaque refreshes.';
-  container.appendChild(noteFilter);
-
-  check('Enable loot filter', () => f.on, (v) => { f.on = v; save(); });
-
-  const typesLine = line('flex-wrap:wrap;gap:2px 14px;align-items:flex-start');
-  typesLine.appendChild(labelSpan('Hide types'));
-  const typesWrap = document.createElement('span');
-  typesWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:2px 14px';
-  for (const key of FILTER_TYPES) {
-    const l = document.createElement('label');
-    l.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px;text-transform:capitalize';
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = !!f.hide[key];
-    box.onchange = () => { f.hide[key] = box.checked; save(); };
-    const span = document.createElement('span');
-    span.textContent = key;
-    l.append(box, span);
-    typesWrap.appendChild(l);
-  }
-  typesLine.appendChild(typesWrap);
-  container.appendChild(typesLine);
-
-  check('Hide all commons', () => f.hideCommon, (v) => { f.hideCommon = v; save(); });
-  number('Hide commons below tier', 0, 12, () => f.commonTier, (v) => { f.commonTier = v; save(); });
-  number('Hide anything below tier', 0, 12, () => f.anyTier, (v) => { f.anyTier = v; save(); });
-
-  const rarityLine = line();
-  const rarity = document.createElement('select');
-  rarity.style.cssText = 'background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:1px 4px';
-  for (const [value, label] of [[0, 'Off'], [1, 'Magic'], [2, 'Rare'], [3, 'Legendary'], [4, 'Artifact']]) {
-    const opt = document.createElement('option');
-    opt.value = String(value);
-    opt.textContent = label;
-    rarity.appendChild(opt);
-  }
-  rarity.value = String(f.minRarity);
-  rarity.onchange = () => { f.minRarity = Number(rarity.value) || 0; save(); };
-  rarityLine.append(labelSpan('Hide below rarity'), rarity);
-  container.appendChild(rarityLine);
-
-  number('Min value (gold)', 0, 1000000, () => f.minValue, (v) => { f.minValue = v; save(); });
-  textField('Hide names (comma)', 'e.g. pellet, arrow, practice', () => f.hideNames, (v) => { f.hideNames = v; save(); });
-  textField('Always keep (comma)', 'e.g. ruby, quest', () => f.keepNames, (v) => { f.keepNames = v; save(); });
-
-  const reset = document.createElement('button');
-  reset.type = 'button';
-  reset.textContent = 'Reset loot filter';
-  reset.style.cssText = 'margin-top:6px;cursor:pointer;background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:2px 10px';
-  reset.onclick = () => {
-    cfg.filter = loadFilter(null);
-    save();
-    buildPane(container);
-  };
-  container.appendChild(reset);
 }
 
 /* ------------------------------------------------------- plaque geometry */
@@ -572,7 +427,7 @@ export function install() {
   cfg ??= load();
   ensureStyle();
   applyColours();
-  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, keepLoot };
+  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows };
   watchPlaque();
   liftTimer ??= setInterval(watchPlaque, 400);
 }

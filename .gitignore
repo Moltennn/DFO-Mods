@@ -10,6 +10,8 @@
 !skillhud-mod/**
 !uitweaks-mod/
 !uitweaks-mod/**
+!lootfilter-mod/
+!lootfilter-mod/**
 
 # generated on each machine by the installers (never commit it)
 modloader/mods.json

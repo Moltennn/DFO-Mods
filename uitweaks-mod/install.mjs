@@ -89,7 +89,17 @@ const B_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);r.tier!=null&&(i.dataset.t
 const A_ROWS_FALLBACK = 'function Pf(e,t=-1,n=0,r=6){';
 const ROWS_RX = /function ([A-Za-z0-9_$]+)\(e,t=-1,n=0,r=6\)\{let i=e\?\.rows\?\.length\?\?0;if\(!e\|\|e\.kind!==`items`/;
 const A_FILTER = ',item:e})),r=n.slice(0,t)';
-const B_FILTER = ',item:e})).filter(e=>globalThis.__dfoUiTweaks?.keepLoot?.(e.item)??true),r=n.slice(0,t)';
+/* the loot filter is its own mod; the row builder calls this generic hook so
+ * either installer can provide it and the other's patches survive */
+const ROW_HOOK = 'globalThis.__dfoRowFilter?.keep?.(e.item)??true';
+const OLD_HOOK_RX = /\.filter\(e=>globalThis\.__dfoUiTweaks\?\.keepLoot\?\.\(e\.item\)\?\?true\)/;
+
+function ensureRowFilter(text) {
+  if (text.includes(ROW_HOOK)) return { text, changed: false };
+  if (OLD_HOOK_RX.test(text)) return { text: text.replace(OLD_HOOK_RX, `.filter(e=>${ROW_HOOK})`), changed: true };
+  if (text.includes(A_FILTER)) return { text: text.replace(A_FILTER, `,item:e})).filter(e=>${ROW_HOOK}),r=n.slice(0,t)`), changed: true };
+  return { text, changed: false, missing: true };
+}
 
 /* ----------------------------------------------------------------- check */
 function checkInstalled() {
@@ -116,6 +126,10 @@ function checkInstalled() {
     try { if (fs.statSync(path.join(store.vFiles, rel)).size !== want.size) return { ok: false, why: `${rel} has the wrong size` }; }
     catch { return { ok: false, why: `${rel} is missing` }; }
   }
+  for (const c of rec.checks || []) {
+    const got = store.read(c.rel);
+    if (!got || !got.bytes.toString('utf8').includes(c.has)) return { ok: false, why: `${c.rel} no longer has the UI Tweaks patch` };
+  }
   if (!readRegistry(store).some((m) => m.id === ID)) return { ok: false, why: 'not registered with the loader' };
   return { ok: true, version: target.version, overlay: !!marker.overlay };
 }
@@ -131,6 +145,7 @@ function installNow() {
 
     const loader = ensureLoader(store, { log });
     const installed = new Set();
+    const checks = [];
 
     // ---- 1. the plaque's item rows --------------------------------------
     {
@@ -148,14 +163,13 @@ function installNow() {
         text = text.replace(ROW_RX, out);
         log(`  patched ${rows.rel} (plaque rows)`);
       }
-      if (text.includes('keepLoot')) log(`  loot filter already applied (${rows.rel})`);
-      else {
-        if (!text.includes(A_FILTER)) die('the plaque row filter anchor was not found - aborting (nothing written)');
-        text = text.replace(A_FILTER, B_FILTER);
-        log(`  patched ${rows.rel} (loot filter)`);
-      }
+      const hook = ensureRowFilter(text);
+      if (hook.missing) die('the plaque row filter anchor was not found - aborting (nothing written)');
+      if (hook.changed) log(`  patched ${rows.rel} (row filter hook)`);
+      else log(`  row filter hook already present (${rows.rel})`);
+      text = hook.text;
       store.write(rows.rel, Buffer.from(text));
-      installed.add(rows.rel);
+      checks.push({ rel: rows.rel, has: 'lootLabel' });
     }
 
     // ---- 2. the plaque renderer: carry the tier to the DOM ---------------
@@ -172,7 +186,7 @@ function installNow() {
         log(`  patched ${renderer.rel} (plaque renderer)`);
       }
       store.write(renderer.rel, Buffer.from(text));
-      installed.add(renderer.rel);
+      checks.push({ rel: renderer.rel, has: 'i.dataset.tier=String(r.tier)' });
     }
 
     // ---- 3. the plaque's row framer: how many rows fit ------------------
@@ -192,7 +206,7 @@ function installNow() {
         log(`  patched ${framer.rel} (row framer)`);
       }
       store.write(framer.rel, Buffer.from(text));
-      installed.add(framer.rel);
+      checks.push({ rel: framer.rel, has: 'lootRows?.()' });
     }
 
     // ---- 4. the mod itself ----------------------------------------------
@@ -222,7 +236,7 @@ function installNow() {
       loader: loaderRecord(store, loader),
       mods: {
         ...(sameVersion ? (marker.mods ?? {}) : {}),
-        [ID]: { build: buildId, files: store.fileMap(installed) },
+        [ID]: { build: buildId, files: store.fileMap(installed), checks },
       },
     };
     writeMarker(next);

@@ -7,7 +7,7 @@ data, never write to a server, and never change a character or a save. The
 disk (a page tag, `boot.js`, the mod registry, a few game scripts) and re-apply
 everything after an update. Nothing is uploaded.
 
-The repository contains three pieces:
+The repository contains four pieces:
 
 - **`modloader/`** — the loader and installer toolkit. It tags the game page,
   serves `assets/dfo-mods/boot.js`, keeps the registry of installed mods, and
@@ -16,6 +16,8 @@ The repository contains three pieces:
   tracked skills' uses toward the next point, configurable from the ESC menu.
 - **`uitweaks-mod/`** — the **UI Tweaks** mod: item tier labels and material
   colours in the world plaque (loot piles), configurable from the ESC menu.
+- **`lootfilter-mod/`** — the **Loot Filter** mod: player-defined junk rules
+  that hide rows from the world plaque, configurable from the ESC menu.
 
 ```
 README.md                 this file
@@ -36,6 +38,9 @@ skillhud-mod/
 uitweaks-mod/
   uitweaks.js             the mod (plaque labels/colours + ESC pane)
   install.mjs             its patches + registration
+lootfilter-mod/
+  lootfilter.js           the mod (hide rules + ESC pane)
+  install.mjs             its hook + registration
 ```
 
 `modloader/mods.json` is generated on each machine and is not tracked.
@@ -80,6 +85,17 @@ Same rules: it installs the shared loader if needed, patches the two game
 chunks that build the world plaque, writes `assets/dfo-uitweaks.js`, and
 registers itself. Then start or restart the game.
 
+### Loot Filter (installs the loader too)
+
+```bash
+cd lootfilter-mod
+node install.mjs
+```
+
+It guarantees the plaque's row-filter hook (the same one UI Tweaks installs -
+either mod makes it work), writes `assets/dfo-lootfilter.js`, and registers
+itself. Then start or restart the game.
+
 ### Loader only
 
 ```bash
@@ -96,9 +112,11 @@ until a mod installer registers one.
 node modloader/install.mjs --check        # 0 healthy, 1 stale, 2 nothing patchable yet
 node skillhud-mod/install.mjs --check
 node uitweaks-mod/install.mjs --check
+node lootfilter-mod/install.mjs --check
 
 node skillhud-mod/install.mjs --uninstall  # this mod only; loader/mods stay
 node uitweaks-mod/install.mjs --uninstall
+node lootfilter-mod/install.mjs --uninstall
 node modloader/install.mjs --uninstall     # refuses while mods are registered
 node modloader/install.mjs --uninstall --force
 ```
@@ -391,44 +409,22 @@ a tall list is lifted by just enough to keep its bottom clear of the hotbar/HUD
 band (never so far that its top leaves the screen).
 
 **ESC → Mods → UI Tweaks** has **Tier labels** (off restores the game's plain
-names), **Colour by material**, the **Colour scheme** (Classic / Bright),
-**List rows** and the **Loot filter** below. Settings live in
-`localStorage['dfoUiTweaks.config.v1']`.
-
-### Loot filter
-
-The panel can hide junk from the world plaque. It is **display-only**: Take all
-and the container window still see every item, and quest items are never
-hidden. Rules combine as "hide if any matches":
-
-- **Enable loot filter** — the master switch.
-- **Hide types** — weapons, armor, gems, clothing, ingredients, misc, books,
-  ammo.
-- **Hide all commons** — anything with no rarity at all.
-- **Hide commons below tier** — commons under the DFO material tier you pick
-  (4 hides Leather/Chain/Iron commons, keeps Steel and up).
-- **Hide anything below tier** — the same cut, applied even to magic+ items.
-- **Hide below rarity** — common / magic / rare / legendary / artifact.
-- **Min value (gold)** — hides anything cheaper.
-- **Hide names (comma)** — substring list, e.g. `pellet, arrow, practice`.
-- **Always keep (comma)** — overrides everything, e.g. `ruby, quest`.
-
-Gems have no material tier, so the tier rules leave them alone — use the type
-switch or the name list for stones. Filter changes apply the next time the
-plaque refreshes (look away and back), like the row count.
+names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
+**List rows**. Settings live in `localStorage['dfoUiTweaks.config.v1']`.
 
 ### What it patches
 
 1. `assets/propBodies-*.js` — the plaque's item-row builder calls
-   `__dfoUiTweaks.lootLabel(item, name)` for each row's label, carries the tier
-   through as `tier`, and drops rows the mod's `keepLoot(item)` rejects.
+   `__dfoUiTweaks.lootLabel(item, name)` for each row's label and carries the
+   tier through as `tier`; it also gets the generic
+   `__dfoRowFilter.keep(item)` hook (shared with Loot Filter).
 2. `assets/deepWaterRuntime-*.js` — the plaque renderer copies `tier` onto the
    row as `data-tier`; the mod's stylesheet keys the colours off it.
 3. `assets/propBodies-*.js` — the plaque's row framer (how many of the pile's
    rows are shown at once, and which slice around the selected one) takes its
    row count from the mod instead of the fixed 6.
 4. `assets/dfo-uitweaks.js` — the mod itself (the label/type/material logic,
-   the filter, the settings and the stylesheet).
+   the settings and the stylesheet).
 
 The game patches are anchored on the code's shape (the row expression, the
 renderer's `data-rarity` line, the framer's signature and test), not on chunk
@@ -437,6 +433,40 @@ hashes or minified names — the row builder and framer are renamed every build
 never hardcoded. A missing anchor aborts before writing. The mod reads only the
 item object the game already hands to the row builder — no game data is
 written.
+
+## Loot Filter
+
+A separate mod that hides junk from the world plaque. It is **display-only**:
+Take all and the container window still see every item, and quest items are
+never hidden. Rules combine as "hide if any matches":
+
+- **Enable loot filter** — the master switch.
+- **Hide types** — weapons, armor, gems, clothing, ingredients, misc, books,
+  ammo.
+- **Hide all commons** — anything with no rarity at all.
+- **Hide commons below tier** — commons under the DFO material tier you pick
+  (4 hides Leather/Chain/Iron commons, keeps Steel and up).
+- **Hide anything below tier** — the same cut applied even to magic+ items.
+- **Hide below rarity** — common / magic / rare / legendary / artifact.
+- **Min value (gold)** — hides anything cheaper.
+- **Hide names (comma)** — substring list, e.g. `pellet, arrow, practice`.
+- **Always keep (comma)** — overrides everything, e.g. `ruby, quest`.
+
+Gems have no material tier, so the tier rules leave them alone — use the type
+switch or the name list for stones. Filter changes apply the next time the
+plaque refreshes (look away and back).
+
+**ESC → Mods → Loot Filter** holds the rules; settings live in
+`localStorage['dfoLootFilter.config.v1']`.
+
+### What it patches
+
+The row builder's one generic hook line — `.filter(e => __dfoRowFilter.keep(...))`
+— plus `assets/dfo-lootfilter.js`. UI Tweaks installs the same hook line (both
+installers are idempotent, and each writes the whole row chunk preserving the
+other's patches), so either mod can be installed first. Uninstalling leaves the
+hook inert; nothing else is touched.
+
 
 ## Troubleshooting
 

@@ -86,8 +86,10 @@ function deferOrDie(msg, seed) {
 const ROW_RX = /name:([A-Za-z0-9_$]+)\(e\)\.name\|\|`Something`,stack:/;
 const A_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);';
 const B_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);r.tier!=null&&(i.dataset.tier=String(r.tier));';
-const A_ROWS = 'function Pf(e,t=-1,n=0,r=6){';
-const B_ROWS = 'function Pf(e,t=-1,n=0,r=globalThis.__dfoUiTweaks?.lootRows?.()??6){';
+const A_ROWS_FALLBACK = 'function Pf(e,t=-1,n=0,r=6){';
+const ROWS_RX = /function ([A-Za-z0-9_$]+)\(e,t=-1,n=0,r=6\)\{let i=e\?\.rows\?\.length\?\?0;if\(!e\|\|e\.kind!==`items`/;
+const A_FILTER = ',item:e})),r=n.slice(0,t)';
+const B_FILTER = ',item:e})).filter(e=>globalThis.__dfoUiTweaks?.keepLoot?.(e.item)??true),r=n.slice(0,t)';
 
 /* ----------------------------------------------------------------- check */
 function checkInstalled() {
@@ -146,6 +148,12 @@ function installNow() {
         text = text.replace(ROW_RX, out);
         log(`  patched ${rows.rel} (plaque rows)`);
       }
+      if (text.includes('keepLoot')) log(`  loot filter already applied (${rows.rel})`);
+      else {
+        if (!text.includes(A_FILTER)) die('the plaque row filter anchor was not found - aborting (nothing written)');
+        text = text.replace(A_FILTER, B_FILTER);
+        log(`  patched ${rows.rel} (loot filter)`);
+      }
       store.write(rows.rel, Buffer.from(text));
       installed.add(rows.rel);
     }
@@ -170,14 +178,17 @@ function installNow() {
     // ---- 3. the plaque's row framer: how many rows fit ------------------
     {
       const framer = store.findChunk({
-        test: (t) => t.includes(A_ROWS) || (t.includes(MARKER) && t.includes('lootRows')),
+        test: (t) => t.includes('lootRows?.()') || ROWS_RX.test(t) || t.includes(A_ROWS_FALLBACK),
       });
       if (!framer) deferOrDie('the plaque row framer was not found and the bundled build is not readable - start the game, then retry', seed);
       let text = framer.text;
       if (text.includes('lootRows?.()')) log(`  row length already applied (${framer.rel})`);
       else {
-        if (!text.includes(A_ROWS)) die('the plaque row framer anchor was not found - aborting (nothing written)');
-        text = text.replace(A_ROWS, B_ROWS);
+        const m = text.match(ROWS_RX);
+        if (!m) die('the plaque row framer anchor was not found - aborting (nothing written)');
+        const fn = m[1];
+        text = text.replace(ROWS_RX,
+          `function ${fn}(e,t=-1,n=0,r=globalThis.__dfoUiTweaks?.lootRows?.()??6){let i=e?.rows?.length??0;if(!e||e.kind!==\`items\``);
         log(`  patched ${framer.rel} (row framer)`);
       }
       store.write(framer.rel, Buffer.from(text));

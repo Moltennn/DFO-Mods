@@ -241,12 +241,6 @@ function materialWord(item) {
   }
   return null;
 }
-function gemGrade(slug) {
-  const parts = String(slug).split('-');
-  const grade = parts.length === 3 ? parts[1] : 'plain';
-  return { plain: 'Plain', chipped: 'Chipped', flawed: 'Flawed', flawless: 'Flawless', perfect: 'Perfect' }[grade] ?? null;
-}
-
 /** The line under the card's name: `T6 . Elven . Long Blade` for weapons,
  *  `T8 . Mithril . Plate` for armour. Falls back to the game's own meta when
  *  there is nothing to say. */
@@ -273,11 +267,7 @@ export function itemFacts(item) {
   const mat = materialWord(item);
   const rows = [];
 
-  if (slug && slug.startsWith('gem-')) {
-    const word = gemGrade(slug);
-    if (word) rows.push(['Gem', word, slug]);
-    return rows;
-  }
+  if (item.group === 'Gems' || slug?.startsWith('gem-')) return rows;
 
   if (item.group === 'Weapons' || item.group === 'Armor') return rows;
 
@@ -286,8 +276,7 @@ export function itemFacts(item) {
     : /Clothing/i.test(group) ? 'Clothing'
       : group === 'Books' ? 'Book'
         : group === 'Jewellery' ? 'Jewellery'
-          : group === 'Gems' ? 'Gem'
-            : group === 'MiscItems' ? 'Misc item'
+          : group === 'MiscItems' ? 'Misc item'
               : null;
   if (kind) rows.push(['Kind', kind, null]);
   return rows;
@@ -318,10 +307,8 @@ function tierCss() {
 .dfo-uitweaks-colours .wplaque-list .wplaque-row[data-tier].sel > span:first-child { text-shadow: 0 0 8px color-mix(in srgb, var(--dfo-tier) 45%, transparent); }
 /* gems carry their colour in the name only - no dot in front of the stone */
 :root .wplaque-list .wplaque-row[data-tier^="gem-"] > span:first-child::before { content: none !important; }
-/* the inventory card wears the same material colour as the plaque; the game
- * colours the name by RARITY (aetheric blue, etc.), so override it */
-:root body .card[data-dfo-tier] > h3 { color: var(--dfo-ink, var(--dfo-tier)) !important; text-shadow: 1px 1px 0 #050608 !important; }
-:root body .card .pair[data-dfo-tier] > dd { color: var(--dfo-ink, var(--dfo-tier)) !important; font-weight: 600; }
+/* the card NAME keeps the game's own rarity colour; only the summary line
+ * under it takes the material colour */
 :root body .card[data-dfo-tier] > p.meta { color: var(--dfo-ink, var(--dfo-tier)) !important; }`];
   for (const scheme of SCHEMES) {
     for (const [slug, c] of Object.entries(PALETTES[scheme])) {

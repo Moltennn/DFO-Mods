@@ -423,10 +423,10 @@ right under the item's name becomes the loot label's summary:
 Weapons show tier · material · skill, armour tier · material · class (the game's
 own `Type` still shows Plate/Chain/Leather). The material is always computed
 from the item, so named/artifact pieces that show no material of their own
-(e.g. *The Last Oath*) read it here; the name and the line take the same
-material colour as the plaque (overriding the game's rarity colour). Gems show
-their grade as a `Gem` stat (`Flawless`) and everything else a plain `Kind`
-(Ingredient / Book / Clothing / Misc item).
+(e.g. *The Last Oath*) read it here. The item's **name keeps the game's own
+rarity colour** (aetheric, magic, …); only the summary line takes the material
+colour. Gems get no extra row — the name already says the grade — and
+everything else shows a plain `Kind` (Ingredient / Book / Clothing / Misc).
 
 **ESC → Mods → UI Tweaks** has **Tier labels** (off restores the game's plain
 names), **Colour by material**, the **Colour scheme** (Classic / Bright) and

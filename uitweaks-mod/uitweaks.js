@@ -422,7 +422,8 @@ export function cardLine(item) {
   const mat = materialWord(item);
   if (mat) parts.push(mat);
   const kind = typeOf(item);
-  if (kind && showType(name, kind)) parts.push(kind);
+  // a leather/chain item's class is the material word already printed
+  if (kind && showType(name, kind) && norm(kind) !== norm(mat)) parts.push(kind);
   const slot = armorSlot(item);
   if (slot && showSlot(name, slot)) parts.push(slot);
   const hands = cfg?.hands === false ? null : handsOf(item);

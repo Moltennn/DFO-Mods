@@ -492,7 +492,9 @@ right under the item's name becomes the loot label's summary:
 
 Weapons show tier · material · skill · **1H/2H**, armour tier · material · class
 · **slot** (the game's own `Type` still shows Plate/Chain/Leather), and
-clothing/jewellery the slot they go to (`Chest`, `Legs`, `Ring`, …). The same
+clothing/jewellery the slot they go to (`Chest`, `Legs`, `Ring`, …). A leather
+or chain class is the same word as the material, so it is printed once
+(`T1 · Leather · Hands`, not `Leather · Leather`). The same
 **Type / slot** setting (Off / Hide obvious / All) governs this line. The
 material is always computed from the item, so named/artifact pieces that show
 no material of their own (e.g. *The Last Oath*) read it here. The item's

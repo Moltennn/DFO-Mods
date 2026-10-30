@@ -363,6 +363,10 @@ type:
   report the right skill), with a name fallback for added content.
 - Armor shows the class the game's own item sheet calls **Type**: Leather,
   Chain or Plate.
+- Cosmetic/wearable items show the slot they go to: **Head, Chest, Legs, Feet,
+  Gloves, Cloak, Ring, Amulet, Bracelet, Bracer, Mark, Crystal** — e.g.
+  `Short Tunic · Chest`, `Casual Pants · Legs`. The slot is skipped when the
+  name already says it (`Ring of Feather`).
 - Ammo (pellets, arrows) carries no grade and no type — it keeps its plain
   name, because its material field is not a metal.
 - Gems carry no grade and no type either, but each is printed in its own
@@ -422,7 +426,8 @@ right under the item's name becomes the loot label's summary:
     T8 · Mithril · Plate
 
 Weapons show tier · material · skill, armour tier · material · class (the game's
-own `Type` still shows Plate/Chain/Leather). The material is always computed
+own `Type` still shows Plate/Chain/Leather), and clothing/jewellery the slot
+they go to (`Chest`, `Legs`, `Ring`, …). The material is always computed
 from the item, so named/artifact pieces that show no material of their own
 (e.g. *The Last Oath*) read it here. The item's **name keeps the game's own
 rarity colour** (aetheric, magic, …); only the summary line takes the material

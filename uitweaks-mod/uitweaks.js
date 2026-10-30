@@ -27,6 +27,16 @@ export const MOD_BUILD = '@BUILD@';
 const MATERIALS = ['Iron', 'Steel', 'Silver', 'Elven', 'Dwarven',
   'Mithril', 'Adamantium', 'Ebony', 'Orcish', 'Daedric'];
 
+/* The game's equip-slot ids (the item's `equipSlot`) and the slot word shown
+ * as a cosmetic item's type - the same slots the inventory's paper doll uses. */
+const SLOT_LABELS = {
+  0: 'Amulet', 1: 'Amulet', 2: 'Bracelet', 3: 'Bracelet', 4: 'Ring', 5: 'Ring',
+  6: 'Bracer', 7: 'Bracer', 8: 'Mark', 9: 'Mark', 10: 'Crystal', 11: 'Crystal',
+  12: 'Head', 13: 'Right arm', 14: 'Cloak', 15: 'Left arm', 16: 'Cloak',
+  17: 'Chest', 18: 'Chest', 19: 'Right hand', 20: 'Gloves', 21: 'Left hand',
+  23: 'Legs', 24: 'Legs', 26: 'Feet',
+};
+
 /* Weapon template indices (the game's own table: Dagger 113 ... Arrow 131).
  * These are Daggerfall's canonical item ids, so an artifact or a renamed
  * weapon still reports the right skill; the name map below covers modded
@@ -194,10 +204,16 @@ function tierNumber(item) {
   const at = MATERIAL_ORDER.findIndex((m) => m.toLowerCase() === slug);
   return at < 0 ? null : at + 1;
 }
+/** The slot a cosmetic/wearable goes to (clothing, jewellery, marks...), or
+ *  null when the item is not worn. */
+function slotLabel(item) {
+  const slot = Number(item?.equipSlot);
+  return Number.isInteger(slot) ? SLOT_LABELS[slot] ?? null : null;
+}
 function typeOf(item) {
   if (!item) return null;
   if (item.group === 'Armor') return armorClass(item);
-  if (item.group !== 'Weapons') return null;
+  if (item.group !== 'Weapons') return slotLabel(item);
   const byIndex = WEAPON_BY_INDEX[Number(item.templateIndex)];
   if (byIndex) return byIndex;
   return WEAPON_TYPES[norm(item.name)] ?? null;
@@ -250,7 +266,7 @@ function materialWord(item) {
  *  there is nothing to say. */
 export function cardLine(item) {
   if (!item || typeof item !== 'object') return null;
-  if (item.group !== 'Weapons' && item.group !== 'Armor') return null;
+  if (item.group !== 'Weapons' && item.group !== 'Armor') return slotLabel(item);
   const parts = [];
   const tier = tierNumber(item);
   if (tier) parts.push(`T${tier}`);
@@ -274,6 +290,7 @@ export function itemFacts(item) {
   if (item.group === 'Gems' || slug?.startsWith('gem-')) return rows;
 
   if (item.group === 'Weapons' || item.group === 'Armor') return rows;
+  if (slotLabel(item)) return rows; // the card line already says the slot
 
   const group = String(item.group ?? '');
   const kind = /Ingredient/i.test(group) ? 'Ingredient'

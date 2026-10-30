@@ -29,7 +29,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const MODLOADER_ROOT = path.resolve(HERE, '..');
 /** the workspace this modloader sits in (holds extract/ and the mod folders) */
 export const WORKSPACE_ROOT = path.resolve(MODLOADER_ROOT, '..');
-const DEFAULT_EXTRACT = path.join(WORKSPACE_ROOT, 'extract', 'squashfs-root', 'resources', 'app', 'dist');
+export const DEFAULT_EXTRACT = path.join(WORKSPACE_ROOT, 'extract', 'squashfs-root', 'resources', 'app', 'dist');
 
 export const ROOT = gameRoot();
 export const STATE_FILE = path.join(ROOT, 'state.json');

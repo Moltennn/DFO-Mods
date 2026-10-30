@@ -249,7 +249,7 @@ function asarFromPath(p) {
 }
 
 /** The game's app.asar as found from a running process, on any platform. */
-function runningAppAsars(tmpdirs) {
+export function runningAppAsars(tmpdirs = [...new Set([process.env.TMPDIR, os.tmpdir(), '/tmp'].filter(Boolean))]) {
   const out = new Set();
 
   if (process.platform === 'linux') {
@@ -309,7 +309,7 @@ function runningAppAsars(tmpdirs) {
 }
 
 /** Well-known install locations (a game that is not running). */
-function installedAppAsars() {
+export function installedAppAsars() {
   const home = os.homedir();
   const out = [];
   const add = (p) => out.push(...asarFromPath(p));

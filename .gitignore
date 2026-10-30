@@ -6,6 +6,9 @@
 !README.md
 !install.sh
 !install.bat
+!play.sh
+!play.command
+!play.bat
 !modloader/
 !modloader/**
 !skillhud-mod/
@@ -18,4 +21,5 @@
 # generated on each machine by the installers (never commit them)
 modloader/mods.json
 modloader/app-path.txt
+modloader/game-path.txt
 modloader/win-sync.vbs

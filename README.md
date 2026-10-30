@@ -23,17 +23,20 @@ The repository contains four pieces:
 README.md                 this file
 install.sh                one-step install/repair for Linux and macOS
 install.bat               one-step install/repair for Windows
+play.sh / play.command    the "DFO Online (Mods)" launcher (Linux/macOS)
+play.bat                  the launcher shortcut target (Windows)
 modloader/
   boot.js                 served as assets/dfo-mods/boot.js
-  install.mjs             install/check/uninstall the loader; --install-watch
-  sync.mjs                autosync: loader + every registered mod
+  install.mjs             install/check/uninstall the loader
+  play.mjs                launch the game, wait for its seed, sync once
+  sync.mjs                one sync: loader + every registered mod
   lib/
     game.mjs              version store + seed discovery (Linux/Windows/macOS)
     store.mjs             open a served build; overlay; read/write/remove
     marker.mjs            Game/.dfo-mods/installed.json (loader + mods)
     registry.mjs          served registry.js + workspace manifest
     loader.mjs            ensure/check/remove the loader
-    autosync.mjs          systemd (Linux) / launchd (macOS) / schtasks (Windows)
+    autosync.mjs          optional background watcher (not installed by default)
 skillhud-mod/
   skillhud.js             the mod (HUD + ESC pane)
   install.mjs             its patches + registration
@@ -76,10 +79,12 @@ install.bat
 ```
 
 Either script installs the loader, every mod in the workspace, and the
-autosync scheduler, then prints the health check. It is idempotent — run it
-again any time (including after a game update) to repair the install.
+**DFO Online (Mods)** launcher, then prints the health check. It is idempotent —
+run it again any time (including after a game update) to repair the install.
+There is no background service: the launcher syncs once when you start the
+game.
 
-On a portable/unpacked build, pass the game once so the headless scheduler can
+On a portable/unpacked build, pass the game once so the launcher and sync can
 find it later:
 
 ```bash
@@ -87,9 +92,10 @@ find it later:
 install.bat "C:\path\to\DFO Online"
 ```
 
-The path is remembered in `modloader/app-path.txt` (local only; autosync reads
-it back). `node modloader/sync.mjs` alone also works and discovers
-`../*-mod/install.mjs` when `modloader/mods.json` has not been generated yet.
+The path is remembered in `modloader/app-path.txt` and
+`modloader/game-path.txt` (local only). `node modloader/sync.mjs` alone also
+works and discovers `../*-mod/install.mjs` when `modloader/mods.json` has not
+been generated yet.
 
 ### Skill Tracker (installs the loader too)
 
@@ -201,24 +207,40 @@ never touches the page. **There are no mod hotkeys.**
 The same doors exist for DevTools: `globalThis.__dfoReloadMods()`,
 `globalThis.__dfoModsReloadOne('skillhud')`, `globalThis.__dfoModsList()`.
 
-## Automatic re-install
+## Starting the game with mods
 
 A game update replaces the served build, so the loader and every mod must be
-re-applied. Install the shared scheduler once:
+re-applied. The installers create a **DFO Online (Mods)** launcher (desktop
+entry, Start-menu shortcut, or `play.command`) that does the work on every
+start:
 
-```bash
-node modloader/install.mjs --install-watch
+```
+play.sh / play.command  ->  node modloader/play.mjs  ->  game
+play.bat                ->  node modloader\play.mjs  ->  game
 ```
 
-It runs `node modloader/sync.mjs` when `Game/state.json` or the launcher's
-`config.json` changes (an update staged/activated, a launch):
+- It starts the game, waits for the build the game bundles ("seed") to be
+  readable, runs `node modloader/sync.mjs` once, and leaves you at the game's
+  Play screen.
+- On an installed macOS/Windows build the seed is on disk, so it syncs *before*
+  the launcher opens; on Linux it waits for the AppImage mount, so press Play
+  after the launcher appears.
+- If the game is already running, the launcher only syncs — no second copy.
+- Nothing runs in the background: the script exists only while it starts the
+  game.
 
-- **Linux** — systemd user units `dfo-mod-sync.path` + `.service`
-  (`journalctl --user -u dfo-mod-sync`).
-- **macOS** — LaunchAgent `dev.dfo.modloader`
-  (`~/Library/Logs/dfo-modloader.log`).
-- **Windows** — Scheduled Task `DFO Mods Sync`, every 5 minutes (no file
-  watcher needed; self-healing after a logout).
+Launch from that shortcut. Starting the game the old way still uses the last
+install; run `node modloader/sync.mjs` (or the shortcut) after an update.
+`node modloader/play.mjs --sync-only` re-syncs without launching, which is handy
+when the game is already open.
+
+The resolved game path is remembered in `modloader/game-path.txt`; pass it once
+with `--app=` if detection fails:
+
+```bash
+node modloader/play.mjs --app="/path/to/DFO Online.AppImage"
+node modloader/play.mjs --app="C:\Program Files\DFO Online\DFO Online.exe"
+```
 
 `sync.mjs` runs the loader installer, then every mod listed in the generated
 `modloader/mods.json`, each with `--if-needed`. When that manifest does not
@@ -226,9 +248,9 @@ exist yet (a fresh checkout), it discovers `../*-mod/install.mjs` and runs
 those once so they register; exit 2 ("nothing patchable right now") is not a
 failure.
 
-`node modloader/install.mjs --remove-watch` removes the scheduler.
-`node skillhud-mod/install.mjs --install-watch` does the same from the mod's
-folder after installing it.
+The older `node modloader/install.mjs --install-watch` background watcher is
+still available if you want it, but the installers no longer set it up;
+`--remove-watch` removes one left by an earlier version.
 
 ## After a game update
 

@@ -3,8 +3,9 @@ rem
 rem DFO Online mods - one-step install/repair for Windows.
 rem
 rem   install.bat                 install the loader and every mod, then set up
-rem                               autosync so a game update re-installs them
-rem   install.bat "C:\path\to\DFO Online.exe"    same, for a portable/unpacked
+rem                               the "DFO Online (Mods)" desktop shortcut
+rem                               (no background service)
+rem   install.bat "C:\path\to\DFO Online.exe"   same, for a portable/unpacked
 rem                               build (or a custom install folder)
 rem
 rem Node.js 18 or newer is required. Everything is idempotent - running it
@@ -14,6 +15,7 @@ cd /d "%~dp0"
 
 if not "%~1"=="" (
   > "modloader\app-path.txt" echo %~1
+  > "modloader\game-path.txt" echo %~1
   set "DFO_APP=%~1"
 )
 
@@ -29,9 +31,14 @@ node "modloader\sync.mjs"
 if errorlevel 1 goto fail
 
 echo.
-echo [dfo-mods] setting up autosync ^(re-installs after a game update^)
-node "modloader\install.mjs" --install-watch
+echo [dfo-mods] removing any background watcher ^(the shortcut replaces it^)
+node "modloader\install.mjs" --remove-watch
+
+echo.
+echo [dfo-mods] setting up the "DFO Online (Mods)" desktop shortcut
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'DFO Online (Mods).lnk')); $s.TargetPath=(Join-Path (Get-Location) 'play.bat'); $s.WorkingDirectory=(Get-Location).Path; $s.Save()"
 if errorlevel 1 goto fail
+echo shortcut: %USERPROFILE%\Desktop\DFO Online (Mods).lnk
 
 echo.
 echo [dfo-mods] checking
@@ -42,7 +49,7 @@ for /d %%D in (*-mod) do (
 )
 
 echo.
-echo Done. The game loads the mods on its next launch.
+echo Done. Start the game from the "DFO Online (Mods)" desktop shortcut.
 pause
 exit /b 0
 

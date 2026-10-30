@@ -119,7 +119,8 @@ function listHas(list, name) {
 /** Which of the pane's type switches this item answers to. */
 function categoryOf(item) {
   if (!item) return 'misc';
-  if (AMMO.test(String(item.name ?? ''))) return 'ammo';
+  const name = String(item.name ?? '');
+  if (AMMO.test(name)) return 'ammo';
   const group = String(item.group ?? '');
   if (group === 'Gems') return 'gems';
   if (/Clothing/i.test(group)) return 'clothing';
@@ -127,6 +128,12 @@ function categoryOf(item) {
   if (group === 'Weapons') return 'weapons';
   if (group === 'Armor') return 'armor';
   if (group === 'Books') return 'books';
+  /* The game files the Holy Tome (template 271) under ReligiousItems, and a
+   * renamed/added book can sit in any group; a tome is a book to the reader.
+   * Match "Book", "Holy Tome", "Book of ...", not a weapon named "Tome ...". */
+  if (Number(item.templateIndex) === 271) return 'books';
+  if (/^(?:the\s+)?(?:book|tome|codex|grimoire)(?:\s+of\b|\s*$)/i.test(name)
+    || /\b(?:book|tome|codex|grimoire)$/i.test(name)) return 'books';
   return 'misc';
 }
 

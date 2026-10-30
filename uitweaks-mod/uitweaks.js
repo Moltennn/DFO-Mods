@@ -267,8 +267,12 @@ export function lootLabel(item, gameName = null) {
   parts.push(name);
 
   const type = typeOf(item);
-  // Leather Cuirass / Chain Greaves already carry their class; don't repeat it.
-  if (type && !norm(name).includes(norm(type))) parts.push(type);
+  /* A material class or weapon skill is skipped when the name already says it
+   * (Leather Cuirass, Elm Long Bow). A cosmetic's slot is the point of the
+   * type, so it is always printed - "Ring of Skill · Ring", "Casual Cloak ·
+   * Cloak", "The Mark of the Hist · Mark". */
+  const wearable = item.group !== 'Armor' && item.group !== 'Weapons';
+  if (type && (wearable || !norm(name).includes(norm(type)))) parts.push(type);
   return parts.join(' \u00b7 ');
 }
 

@@ -365,11 +365,12 @@ type:
   Chain or Plate.
 - Cosmetic/wearable items show the slot they go to: **Head, Chest, Legs, Feet,
   Gloves, Cloak, Ring, Amulet, Bracelet, Bracer, Mark, Crystal** — e.g.
-  `Short Tunic · Chest`, `Casual Pants · Legs`. Only a *worn* item carries an
-  `equipSlot`; one on the ground or in the pack does not, so the slot comes
-  from the game's own template→slot table (the paper doll's, 133–216) with
-  `equipSlot` first when present. The slot is skipped when the name already
-  says it (`Ring of Feather`).
+  `Short Tunic · Chest`, `Casual Pants · Legs`, `Ring of Skill · Ring`,
+  `Casual Cloak · Cloak`. Only a *worn* item carries an `equipSlot`; one on the
+  ground or in the pack does not, so the slot comes from the game's own
+  template→slot table (the paper doll's, 133–216) with `equipSlot` first when
+  present. The slot is the item's type, so it is always printed — it is not
+  dropped just because the name happens to contain the word.
 - Ammo (pellets, arrows) carries no grade and no type — it keeps its plain
   name, because its material field is not a metal.
 - Gems carry no grade and no type either, but each is printed in its own

@@ -270,7 +270,12 @@ Patches:
 
 Runtime pieces:
 
-- `keep(item)` — display filter; `/` and name lists, type, rarity, tier, value.
+- `keep(item)` — display filter; walks the ordered rule list (first match wins).
+  Conditions read `fieldValue(field, item)` (type, rarity, tier, stack, value,
+  name, enchanted, artifact, hands, slot); a missing value never matches. The
+  v1 switches are converted once by `fromV1`. `enchanted` is any rarity above
+  common: in game a magic item can carry only `rarity: 'magic'` with `magic: false`.
+  Armour slots come from the Armor template table (102-112), then from the name.
 - `pick(state)` — the selected row's own item (or `state.dfoItem`).
 - `hideItems`/`hideCorpse` — a pile/corpse whose rows are all hidden is put to
   sleep (`inactive` / `corpseDisabled`), never deleted; the 700 ms sync wakes

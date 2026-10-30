@@ -214,22 +214,37 @@ already the material word.
 
 ## Loot Filter
 
-A separate mod that hides junk from the world plaque. Rules combine as “hide if
-any matches”; quest items are never hidden. Hidden items never reach the plaque,
+A separate mod that hides junk from the world plaque. It is a list of rules:
+each rule is **Show** or **Hide** plus conditions that must all match. Rules are
+read top to bottom and the first match decides; an item no rule matches is
+shown. Quest items are never hidden. Hidden items never reach the plaque,
 and a pile/corpse with nothing left to show is put to sleep so it leaves the
 world's sprites and the loot targets too — nothing is ever deleted, and
 clearing the rule wakes it intact.
 
+Conditions, each used once per rule:
+
+- **Type** — weapons, armor, gems, clothing, ingredients, misc, books,
+  religious items, ammo (`=`, `≠`).
+- **Rarity** — common / magic / rare / legendary / artifact (`=`, `≠`, `<`, `≤`,
+  `>`, `≥`).
+- **Tier** — material tier 1–12 (`=`, `≠`, `<`, `≤`, `>`, `≥`). Only weapons and
+  armour have a tier; a tier condition never matches anything else. Tiers run
+  Leather 1, Chain 2, Iron 3 … Daedric 12, so weapons start at 3.
+- **Stack size** — the count in the stack (`=`, `≠`, `<`, `≤`, `>`, `≥`).
+- **Value** — gold (`=`, `≠`, `<`, `≤`, `>`, `≥`).
+- **Name** — contains text.
+- **Enchanted** (magic rarity or better) and **Artifact** — yes / no.
+- **Hands** — one-handed or two-handed weapons.
+- **Armour slot** — chest, hands, legs, arms, head, feet, shield (`=`, `≠`). Taken
+  from the game's equip table, or from the item name when the template is not in it
+  (for example Fur Helmet).
+
+A rule with no conditions matches everything. The list holds up to 20 rules.
+Example: *Hide when Rarity = Common and Tier ≤ 2* hides basic common leather
+and chain armour; it does not reach weapons, which start at tier 3.
+
 - **Enable loot filter** — the master switch.
-- **Hide types** — weapons, armor, gems, clothing, ingredients, misc, books,
-  religious items, ammo.
-- **Hide all commons** — anything with no rarity.
-- **Hide commons below tier** — commons under the material tier you pick.
-- **Hide anything below tier** — the same cut even for magic+ items.
-- **Hide below rarity** — common / magic / rare / legendary / artifact.
-- **Min value (gold)** — hides anything cheaper.
-- **Hide names (comma)** and **Always keep (comma)** — substring lists; keep
-  wins.
 - **Show all while holding** — a held key (default **Alt**, ARPG-style) that
   bypasses the filter: every row returns and sleeping piles/corpses wake until
   you let go. Click the key button and press another key to rebind; Backspace /
@@ -240,7 +255,9 @@ a different item that the filter hid at the same index. **Take all** is the
 exception: it still takes everything in the pile, hidden rows included.
 
 **ESC → Mods → Loot Filter** holds the rules; settings live in
-`localStorage['dfoLootFilter.config.v1']`.
+`localStorage['dfoLootFilter.config.v2']`. The first run after the update
+turns the old switches into rules, so nothing is lost. The old
+`dfoLootFilter.config.v1` entry is left in place and is no longer read.
 
 ## Troubleshooting
 

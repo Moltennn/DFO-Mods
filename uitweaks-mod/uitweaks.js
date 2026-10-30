@@ -189,12 +189,13 @@ function load() {
         labels: raw.labels !== false,
         colours: raw.colours !== false,
         hideObvious: raw.hideObvious !== false,
+        hands: raw.hands !== false,
         scheme,
         rows: clampRows(raw.rows),
       };
     }
   } catch { /* unreadable - defaults */ }
-  return { labels: true, colours: true, hideObvious: true, scheme: 'classic', rows: ROWS_DEFAULT };
+  return { labels: true, colours: true, hideObvious: true, hands: true, scheme: 'classic', rows: ROWS_DEFAULT };
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch { /* private mode */ }
@@ -278,13 +279,40 @@ function typeOf(item) {
 /** True when the name already says the type: "Longsword" is a long blade, a
  *  "Formal Cloak" a cloak, a "Battle Axe" an axe. Whole tokens only, with a
  *  simple plural ("Plain Robes", "Shoes"). */
+/** Whole-word (and simple-plural) match on the normalized name. */
+function hasWord(name, word) {
+  const padded = ` ${norm(name)} `;
+  return padded.includes(` ${word} `) || padded.includes(` ${word}s `)
+    || (word.endsWith('s') && padded.includes(` ${word.slice(0, -1)} `));
+}
+
 function obviousType(name, type) {
   const words = OBVIOUS_WORDS[type];
-  if (!words) return false;
-  const padded = ` ${norm(name)} `;
-  const has = (w) => padded.includes(` ${w} `) || padded.includes(` ${w}s `)
-    || (w.endsWith('s') && padded.includes(` ${w.slice(0, -1)} `));
-  return words.some(has);
+  return !!words && words.some((w) => hasWord(name, w));
+}
+
+/* One- or two-handed, from the game's own weapon table (equipRules `Xe`):
+ * 113 Dagger … 127 Battle Axe are Either (one hand), 115 Staff, 122 Claymore,
+ * 123 Dai-Katana, 125 Warhammer, 126 Flail, 128 War Axe and the bows are Both.
+ * Artifacts use special templates: 560 is Both, 562/563 Either. Unknown
+ * templates (added content) fall back to the name. */
+const WEAPON_HANDS = {
+  113: 1, 114: 1, 116: 1, 117: 1, 118: 1, 119: 1, 120: 1, 121: 1, 124: 1, 127: 1,
+  115: 2, 122: 2, 123: 2, 125: 2, 126: 2, 128: 2, 129: 2, 130: 2,
+  560: 2, 562: 1, 563: 1,
+};
+const TWO_HAND_WORDS = ['staff', 'claymore', 'dai katana', 'dai-katana', 'warhammer', 'war hammer', 'flail', 'war axe', 'short bow', 'shortbow', 'long bow', 'longbow', 'bow'];
+const ONE_HAND_WORDS = ['dagger', 'tanto', 'shortsword', 'short sword', 'wakazashi', 'broadsword', 'broad sword', 'saber', 'sabre', 'longsword', 'long sword', 'katana', 'mace', 'battle axe', 'axe'];
+
+/** 1 or 2 for a weapon, null for anything else (ammo included). */
+function handsOf(item) {
+  if (!item || item.group !== 'Weapons') return null;
+  if (AMMO.test(String(item.name ?? ''))) return null;
+  const byIndex = WEAPON_HANDS[Number(item.templateIndex)];
+  if (byIndex) return byIndex;
+  if (TWO_HAND_WORDS.some((w) => hasWord(item.name, w))) return 2;
+  if (ONE_HAND_WORDS.some((w) => hasWord(item.name, w))) return 1;
+  return null;
 }
 
 /** The plaque row label. The installer calls this with the raw item and the
@@ -312,6 +340,10 @@ export function lootLabel(item, gameName = null) {
    * (Formal Cloak ... cloak, Longsword ... long blade, Battle Axe ... axe);
    * with the switch off every item prints its type. */
   if (type && !(cfg.hideObvious && obviousType(name, type))) parts.push(type);
+  /* Weapons also say whether they take one hand or two; ammo and non-weapons
+   * stay plain. */
+  const hands = cfg.hands === false ? null : handsOf(item);
+  if (hands) parts.push(`${hands}H`);
   return parts.join(' \u00b7 ');
 }
 
@@ -504,6 +536,7 @@ function buildPane(container) {
   container.appendChild(note);
   check('Tier labels', () => cfg.labels, (v) => { cfg.labels = v; save(); });
   check('Hide obvious types (Cloak, Longsword, Axe)', () => cfg.hideObvious, (v) => { cfg.hideObvious = v; save(); });
+  check('Weapon hands (1H / 2H)', () => cfg.hands, (v) => { cfg.hands = v; save(); });
   check('Colour by material', () => cfg.colours, (v) => { cfg.colours = v; save(); applyColours(); });
 
   const schemes = [

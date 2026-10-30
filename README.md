@@ -399,7 +399,12 @@ type:
   says Leather).
 - Weapons show the skill they belong to, from the template index
   (Daggerfall's canonical ids, 113–131, so artifacts and renamed weapons still
-  report the right skill), with a name fallback for added content.
+  report the right skill), with a name fallback for added content. They also
+  say **1H** or **2H** from the game's own weapon table: one-handed for
+  Dagger/Tanto/Shortsword/Wakazashi/Broadsword/Saber/Longsword/Katana/Mace/
+  Battle Axe, two-handed for Staff/Claymore/Dai-Katana/Warhammer/Flail/War
+  Axe/both bows. Artifact templates follow the game's special cases (560 two,
+  562/563 one); unknown added weapons fall back to the name.
 - Armor shows the class the game's own item sheet calls **Type**: Leather,
   Chain or Plate.
 - Cosmetic/wearable items show the slot they go to: **Head, Chest, Legs, Feet,
@@ -488,9 +493,9 @@ colour. Gems get no extra row — the name already says the grade — and
 everything else shows a plain `Kind` (Ingredient / Book / Clothing / Misc).
 
 **ESC → Mods → UI Tweaks** has **Tier labels** (off restores the game's plain
-names), **Hide obvious types**, **Colour by material**, the **Colour scheme**
-(Classic / Bright) and **List rows**. Settings live in
-`localStorage['dfoUiTweaks.config.v1']`.
+names), **Hide obvious types**, **Weapon hands (1H / 2H)**, **Colour by
+material**, the **Colour scheme** (Classic / Bright) and **List rows**.
+Settings live in `localStorage['dfoUiTweaks.config.v1']`.
 
 ### What it patches
 

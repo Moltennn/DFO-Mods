@@ -28,6 +28,50 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.trunc(Number(n) || 0
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 let cfg = null;
+/* Held reveal key: while it is down the filter is bypassed (every row shows
+ * and sleeping piles/corpses are woken). Bound in install(). */
+let revealed = false;
+let keyCapture = false;
+let keyBound = false;
+
+function prettyKey(key) {
+  if (!key || key === 'none') return 'None';
+  if (key === ' ') return 'Space';
+  if (key === 'Control') return 'Ctrl';
+  return String(key).length === 1 ? String(key).toUpperCase() : String(key);
+}
+function revealMatches(ev) {
+  const want = String(cfg?.revealKey ?? 'Alt');
+  if (!want || want.toLowerCase() === 'none') return false;
+  return ev.key === want || String(ev.key).toLowerCase() === want.toLowerCase();
+}
+function onRevealDown(ev) {
+  if (keyCapture || ev.repeat || !revealMatches(ev)) return;
+  if (!revealed) { revealed = true; syncPiles(); }
+}
+function onRevealUp(ev) {
+  if (keyCapture || !revealMatches(ev)) return;
+  if (revealed) { revealed = false; syncPiles(); }
+}
+function onRevealBlur() {
+  if (!revealed) return;
+  revealed = false;
+  syncPiles();
+}
+function bindReveal() {
+  if (keyBound || typeof window === 'undefined') return;
+  window.addEventListener('keydown', onRevealDown, true);
+  window.addEventListener('keyup', onRevealUp, true);
+  window.addEventListener('blur', onRevealBlur);
+  keyBound = true;
+}
+function unbindReveal() {
+  if (!keyBound || typeof window === 'undefined') return;
+  window.removeEventListener('keydown', onRevealDown, true);
+  window.removeEventListener('keyup', onRevealUp, true);
+  window.removeEventListener('blur', onRevealBlur);
+  keyBound = false;
+}
 
 function defaults() {
   return {
@@ -40,6 +84,7 @@ function defaults() {
     minValue: 0,
     hideNames: '',
     keepNames: '',
+    revealKey: 'Alt',
   };
 }
 function load() {
@@ -56,6 +101,7 @@ function load() {
   out.minValue = clamp(f.minValue, 0, 1000000);
   out.hideNames = String(f.hideNames ?? '');
   out.keepNames = String(f.keepNames ?? '');
+  out.revealKey = typeof f.revealKey === 'string' && f.revealKey ? f.revealKey : 'Alt';
   return out;
 }
 function save() {
@@ -115,6 +161,7 @@ function rarityWord(item) {
 
 /** The plaque row filter. Called by the game's row builder for every item. */
 export function keep(item) {
+  if (revealed) return true; // the reveal key is held: show everything
   if (!cfg?.on || !item || typeof item !== 'object') return true;
   if (item.questItem) return true; // quest items are never junk
 
@@ -181,13 +228,13 @@ function syncPiles() {
 
 /** Nothing on the body would be shown: it is empty, or every item is filtered. */
 function hideItems(items) {
-  if (!cfg?.on) return false;
+  if (!cfg?.on || revealed) return false;
   if (!Array.isArray(items) || items.length === 0) return true;
   return items.every((item) => !keep(item));
 }
 /** The renderer asks this before standing a dead foe's body (and its sprite). */
 export function hideCorpse(foe) {
-  if (!cfg?.on || !foe?.dead) return false;
+  if (!cfg?.on || revealed || !foe?.dead) return false;
   return hideItems(foe.entity?.items);
 }
 
@@ -254,6 +301,37 @@ function buildPane(container) {
 
   check('Enable loot filter', () => f.on, (v) => { f.on = v; save(); });
 
+  // held reveal key: every row shows while it is down (Alt by default)
+  const keyLine = line();
+  keyLine.appendChild(labelSpan('Show all while holding'));
+  const keyBtn = document.createElement('button');
+  keyBtn.type = 'button';
+  keyBtn.textContent = prettyKey(f.revealKey);
+  keyBtn.style.cssText = 'cursor:pointer;background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:2px 10px;min-width:70px';
+  keyBtn.onclick = () => {
+    keyCapture = true;
+    keyBtn.textContent = 'Press a key…';
+    const done = (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      window.removeEventListener('keydown', done, true);
+      keyCapture = false;
+      if (ev.key === 'Escape') { /* cancel */ }
+      else if (ev.key === 'Backspace' || ev.key === 'Delete') f.revealKey = 'none';
+      else f.revealKey = ev.key;
+      save();
+      keyBtn.textContent = prettyKey(f.revealKey);
+      if (revealed) { revealed = false; syncPiles(); }
+    };
+    window.addEventListener('keydown', done, true);
+  };
+  keyLine.appendChild(keyBtn);
+  const keyHint = document.createElement('span');
+  keyHint.style.cssText = 'color:var(--dim,#b9b2a1);font-size:11px';
+  keyHint.textContent = '(hold in game; Backspace = none)';
+  keyLine.appendChild(keyHint);
+  container.appendChild(keyLine);
+
   const typesLine = line('flex-wrap:wrap;gap:2px 14px;align-items:flex-start');
   typesLine.appendChild(labelSpan('Hide types'));
   const typesWrap = document.createElement('span');
@@ -311,6 +389,7 @@ function buildPane(container) {
 export function install() {
   cfg ??= load();
   globalThis.__dfoRowFilter = { keep, hideCorpse };
+  bindReveal();
   syncPiles();
   pileTimer ??= setInterval(syncPiles, 700);
 }
@@ -318,6 +397,8 @@ export function install() {
 export function unmount() {
   if (globalThis.__dfoRowFilter?.keep === keep) delete globalThis.__dfoRowFilter;
   if (pileTimer) { clearInterval(pileTimer); pileTimer = null; }
+  unbindReveal();
+  revealed = false;
   const piles = globalThis.__dfoPiles?._piles;
   if (Array.isArray(piles)) {
     for (const pile of piles) if (pile && hiddenByUs.has(pile)) { pile.inactive = false; hiddenByUs.delete(pile); }

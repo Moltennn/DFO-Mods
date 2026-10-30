@@ -555,10 +555,16 @@ targets too — nothing is ever deleted, and clearing the rule wakes it intact.
 - **Min value (gold)** — hides anything cheaper.
 - **Hide names (comma)** — substring list, e.g. `pellet, arrow, practice`.
 - **Always keep (comma)** — overrides everything, e.g. `ruby, quest`.
+- **Show all while holding** — a held key that bypasses the whole filter while
+  it is down (default **Alt**, ARPG-style): every row comes back and sleeping
+  piles/corpses wake until you let go. Click the key button and press another
+  key to rebind it; Backspace/Delete sets **None**. Modifier keys (Alt, Ctrl,
+  Shift) are the safe choices — a letter also goes to the game while held.
 
 Gems have no material tier, so the tier rules leave them alone — use the type
 switch or the name list for stones. Filter changes apply the next time the
-plaque refreshes (look away and back).
+plaque refreshes (look away and back); the reveal key is read as the plaque
+rebuilds.
 
 A pile is hidden **as a whole**: if every item in it is filtered out and the
 pile was not actually empty, the plaque does not appear at all (no title with an

@@ -419,7 +419,8 @@ type:
   the ground or in the pack does not, so the slot comes from the game's own
   template→slot table (the paper doll's, 133–216) with `equipSlot` first when
   present.
-- **Hide obvious types** (on by default) leaves the type off when the name
+- **Type / slot** picks how much of that type is shown — **Off**, **Hide
+  obvious** (the default) or **All**. Hide obvious leaves it off when the name
   already says it in plain language, so the list carries only what it adds.
   The test is the type's own vocabulary, matched on whole words: `Formal
   Cloak` → cloak, `Longsword` → long blade, `Battle Axe` → axe, `Mace`/`Staff`
@@ -428,8 +429,9 @@ type:
   don't give it away keep the type: `Saber · Long Blade`, `Katana · Long
   Blade`, `Broadsword · Long Blade`, `Short Tunic · Chest`,
   `The Vestments of Stendarr · Chest`, `Foxglove · Ring`, `Wyrmbane · Long
-  Blade`. Untick it to print the type on every row — `Casual Cloak · Cloak`,
-  `Longsword of Skill · Long Blade`.
+  Blade`. **All** prints it on every row — `Casual Cloak · Cloak`,
+  `Longsword of Skill · Long Blade`; **Off** leaves it out entirely. The item
+  card's line under the name follows the same choice.
 - Ammo (pellets, arrows) carries no grade and no type — it keeps its plain
   name, because its material field is not a metal.
 - Gems carry no grade and no type either, but each is printed in its own
@@ -488,19 +490,21 @@ right under the item's name becomes the loot label's summary:
     The Last Oath
     T8 · Mithril · Plate
 
-Weapons show tier · material · skill, armour tier · material · class (the game's
-own `Type` still shows Plate/Chain/Leather), and clothing/jewellery the slot
-they go to (`Chest`, `Legs`, `Ring`, …). The material is always computed
-from the item, so named/artifact pieces that show no material of their own
-(e.g. *The Last Oath*) read it here. The item's **name keeps the game's own
-rarity colour** (aetheric, magic, …); only the summary line takes the material
-colour. Gems get no extra row — the name already says the grade — and
-everything else shows a plain `Kind` (Ingredient / Book / Clothing / Misc).
+Weapons show tier · material · skill · **1H/2H**, armour tier · material · class
+· **slot** (the game's own `Type` still shows Plate/Chain/Leather), and
+clothing/jewellery the slot they go to (`Chest`, `Legs`, `Ring`, …). The same
+**Type / slot** setting (Off / Hide obvious / All) governs this line. The
+material is always computed from the item, so named/artifact pieces that show
+no material of their own (e.g. *The Last Oath*) read it here. The item's
+**name keeps the game's own rarity colour** (aetheric, magic, …); only the
+summary line takes the material colour. Gems get no extra row — the name
+already says the grade — and everything else shows a plain `Kind` (Ingredient /
+Book / Clothing / Misc).
 
 **ESC → Mods → UI Tweaks** has **Tier labels** (off restores the game's plain
-names), **Hide obvious types**, **Weapon hands (1H / 2H)**, **Colour by
-material**, the **Colour scheme** (Classic / Bright) and **List rows**.
-Settings live in `localStorage['dfoUiTweaks.config.v1']`.
+names), **Type / slot** (Off / Hide obvious / All), **Weapon hands (1H / 2H)**,
+**Colour by material**, the **Colour scheme** (Classic / Bright) and **List
+rows**. Settings live in `localStorage['dfoUiTweaks.config.v1']`.
 
 ### What it patches
 

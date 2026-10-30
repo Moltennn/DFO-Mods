@@ -74,7 +74,7 @@ const WEAPON_BY_INDEX = {
 };
 
 /* Name words that already give the type away, keyed by the type they stand for.
- * "Hide obvious types" leaves the type off only for these: a Formal Cloak is
+ * In the "Hide obvious" mode the type is left off for these: a Formal Cloak is
  * plainly a cloak, a Longsword a long blade, a Battle Axe an axe. Words are
  * matched on whole tokens of the normalized name, so "market" is not a mark
  * and "elbow" is not a bow. A type with no words listed here always prints. */
@@ -179,23 +179,34 @@ let styleEl = null;
 
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
+/* How much of the type/slot a label carries:
+ *   off      - none (tier/material and the name only)
+ *   obvious  - only when the name does not already say it
+ *   all      - always */
+const TYPE_MODES = ['off', 'obvious', 'all'];
+const TYPE_MODE_DEFAULT = 'obvious';
+
 function load() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (raw && typeof raw === 'object') {
       // pre-1.1 schemes ('metal' / 'full') both become the classic palette
       const scheme = SCHEMES.includes(raw.scheme) ? raw.scheme : 'classic';
+      // older configs had a hideObvious checkbox instead of the dropdown
+      const typeMode = TYPE_MODES.includes(raw.typeMode)
+        ? raw.typeMode
+        : (raw.hideObvious === false ? 'all' : TYPE_MODE_DEFAULT);
       return {
         labels: raw.labels !== false,
         colours: raw.colours !== false,
-        hideObvious: raw.hideObvious !== false,
+        typeMode,
         hands: raw.hands !== false,
         scheme,
         rows: clampRows(raw.rows),
       };
     }
   } catch { /* unreadable - defaults */ }
-  return { labels: true, colours: true, hideObvious: true, hands: true, scheme: 'classic', rows: ROWS_DEFAULT };
+  return { labels: true, colours: true, typeMode: TYPE_MODE_DEFAULT, hands: true, scheme: 'classic', rows: ROWS_DEFAULT };
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch { /* private mode */ }
@@ -334,6 +345,18 @@ function handsOf(item) {
   return null;
 }
 
+/** The type/slot display mode; a type is printed when this allows it. */
+function showType(name, type) {
+  const mode = cfg?.typeMode ?? TYPE_MODE_DEFAULT;
+  if (mode === 'off') return false;
+  return mode === 'all' || !obviousType(name, type);
+}
+function showSlot(name, slot) {
+  const mode = cfg?.typeMode ?? TYPE_MODE_DEFAULT;
+  if (mode === 'off') return false;
+  return mode === 'all' || !hasWord(name, norm(slot));
+}
+
 /** The plaque row label. The installer calls this with the raw item and the
  *  game's own computed name (so quality words and epithets survive). */
 export function lootLabel(item, gameName = null) {
@@ -355,14 +378,10 @@ export function lootLabel(item, gameName = null) {
   parts.push(name);
 
   const type = typeOf(item);
-  /* "Hide obvious types" drops the type when the name already says it
-   * (Formal Cloak ... cloak, Longsword ... long blade, Battle Axe ... axe);
-   * with the switch off every item prints its type. */
-  if (type && !(cfg.hideObvious && obviousType(name, type))) parts.push(type);
-  /* Armour also says where it goes: Buckler/Shield, Greaves/Legs, Helm/Head...
-   * skipped when the name already says it (Tower Shield). */
+  if (type && showType(name, type)) parts.push(type);
+  /* Armour also says where it goes: Buckler/Shield, Greaves/Legs, Helm/Head. */
   const slot = armorSlot(item);
-  if (slot && !hasWord(name, norm(slot))) parts.push(slot);
+  if (slot && showSlot(name, slot)) parts.push(slot);
   /* Weapons also say whether they take one hand or two; ammo and non-weapons
    * stay plain. */
   const hands = cfg.hands === false ? null : handsOf(item);
@@ -391,14 +410,23 @@ function materialWord(item) {
  *  there is nothing to say. */
 export function cardLine(item) {
   if (!item || typeof item !== 'object') return null;
-  if (item.group !== 'Weapons' && item.group !== 'Armor') return slotLabel(item);
+  const name = String(item.name ?? '');
+  /* clothing/jewellery: the card line is the slot itself */
+  if (item.group !== 'Weapons' && item.group !== 'Armor') {
+    const slot = slotLabel(item);
+    return slot && showSlot(name, slot) ? slot : null;
+  }
   const parts = [];
   const tier = tierNumber(item);
   if (tier) parts.push(`T${tier}`);
   const mat = materialWord(item);
   if (mat) parts.push(mat);
   const kind = typeOf(item);
-  if (kind) parts.push(kind);
+  if (kind && showType(name, kind)) parts.push(kind);
+  const slot = armorSlot(item);
+  if (slot && showSlot(name, slot)) parts.push(slot);
+  const hands = cfg?.hands === false ? null : handsOf(item);
+  if (hands) parts.push(`${hands}H`);
   return parts.join(' \u00b7 ') || null;
 }
 
@@ -555,10 +583,26 @@ function buildPane(container) {
 
   const note = document.createElement('div');
   note.style.cssText = 'color:var(--dim,#b9b2a1);font-size:12px;margin:6px 0 2px';
-  note.textContent = 'Loot piles (and any other world plaque) print a tier by material, with the weapon skill, armor class or clothing slot after the name. Hide obvious types leaves that last word off when the name already says it (Formal Cloak, Longsword, Battle Axe); untick it to print the type on every row. The list length applies the next time the plaque refreshes (look away and back).';
+  note.textContent = 'Loot piles (and any other world plaque) print a tier by material, then the weapon skill, armor class, armor/clothing slot and 1H/2H. Type / slot picks whether that type word is always shown, hidden when the name already says it (Formal Cloak, Longsword), or left off; the item card follows the same choice. The list length applies the next time the plaque refreshes (look away and back).';
   container.appendChild(note);
   check('Tier labels', () => cfg.labels, (v) => { cfg.labels = v; save(); });
-  check('Hide obvious types (Cloak, Longsword, Axe)', () => cfg.hideObvious, (v) => { cfg.hideObvious = v; save(); });
+
+  // the type/slot dropdown: off, hide obvious, all
+  const typeLine = line();
+  typeLine.appendChild(labelSpan('Type / slot'));
+  const typeSelect = document.createElement('select');
+  typeSelect.style.cssText = 'background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:1px 4px';
+  for (const [value, label] of [['off', 'Off'], ['obvious', 'Hide obvious'], ['all', 'All']]) {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    typeSelect.appendChild(option);
+  }
+  typeSelect.value = cfg.typeMode ?? TYPE_MODE_DEFAULT;
+  typeSelect.onchange = () => { cfg.typeMode = typeSelect.value; save(); };
+  typeLine.appendChild(typeSelect);
+  container.appendChild(typeLine);
+
   check('Weapon hands (1H / 2H)', () => cfg.hands, (v) => { cfg.hands = v; save(); });
   check('Colour by material', () => cfg.colours, (v) => { cfg.colours = v; save(); applyColours(); });
 

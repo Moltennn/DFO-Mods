@@ -4,6 +4,7 @@
 *
 !.gitignore
 !README.md
+!DEVELOPING.md
 !install.sh
 !install.bat
 !play.sh

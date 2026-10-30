@@ -67,6 +67,7 @@ function normalize(c) {
   c.skillLevels = c.skillLevels !== false;
   c.rowGap = Math.min(ROW_GAP_MAX, Math.max(ROW_GAP_MIN, Math.round(c.rowGap ?? ROW_GAP_DEFAULT)));
   delete c.hideKey; // the keybind is gone; drop it from older configs
+  delete c.showLevel; // superseded by skillLevels (per-row skill text)
   return c;
 }
 function builtDefaults(e) {

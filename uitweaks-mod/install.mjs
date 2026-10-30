@@ -95,9 +95,14 @@ const A_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);';
 const B_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);r.tier!=null&&(i.dataset.tier=String(r.tier));';
 /* the inventory item card's stat list: add our rows right after "Hands" */
 const A_CARD = 'm(`Type`,o.armorType),m(`Hands`,o.hands);';
+/* 0.1.13448 moved the card to a model object (the item is `a.item`) and renamed
+ * the row helper; capture both from the game's own "Type"/"Hands" pair. */
+const CARD_STATS_RX = /([A-Za-z0-9_$]+)\(`Type`,([A-Za-z0-9_$]+)\.armorType\),\1\(`Hands`,\2\.hands\);/;
 /* the line under the card's name (material/stack) - the mod puts the summary there */
 const A_META = 'let d=[o.material,o.stack?`${o.stack} of them`:null].filter(Boolean).join(` · `);d&&l.append(U(`p`,`meta`,d));';
 const B_META = 'let d=globalThis.__dfoUiTweaks?.cardLine?.(e)||[o.material,o.stack?`${o.stack} of them`:null].filter(Boolean).join(` · `);d&&l.append(U(`p`,`meta`,d));';
+/* the same line in the 0.1.13448 shape: `let u=[a.material,...];u&&c.append(W(`p`,`meta`,u));` */
+const CARD_META_RX = /([A-Za-z0-9_$]+)=\[([A-Za-z0-9_$]+)\.material,\2\.stack\?`\$\{\2\.stack\} of them`:null\]\.filter\(Boolean\)\.join\(` · `\);\1&&([A-Za-z0-9_$]+)\.append\(([A-Za-z0-9_$]+)\(`p`,`meta`,\1\)\)/;
 const OLD_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts)for(let _f of globalThis.__dfoUiTweaks.itemFacts(e))m(_f[0],_f[1]);';
 const PREV_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts){const _c=p.closest(`.card`),_t=globalThis.__dfoUiTweaks.tierOf?.(e);_c&&_t&&(_c.dataset.dfoTier=_t);for(const _f of globalThis.__dfoUiTweaks.itemFacts(e)){m(_f[0],_f[1]);_f[2]&&p.lastElementChild&&(p.lastElementChild.dataset.dfoTier=_f[2])}}';
 const B_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts){for(const _f of globalThis.__dfoUiTweaks.itemFacts(e)){m(_f[0],_f[1]);_f[2]&&p.lastElementChild&&(p.lastElementChild.dataset.dfoTier=_f[2])}queueMicrotask(()=>{const _c=p.closest(`.card`),_t=globalThis.__dfoUiTweaks.tierOf?.(e);_c&&_t&&(_c.dataset.dfoTier=_t)})}';
@@ -267,27 +272,47 @@ function installNow() {
     // ---- 4. the inventory item card -------------------------------------
     {
       const card = store.findChunk({
-        test: (t) => t.includes(A_CARD) || t.includes('cardLine?.(e)'),
+        test: (t) => CARD_STATS_RX.test(t) || CARD_META_RX.test(t)
+          || t.includes(A_CARD) || t.includes('cardLine?.'), 
       });
       if (!card) deferOrDie('the inventory item card was not found and the bundled build is not readable - start the game, then retry', seed);
       let text = card.text;
-      if (text.includes('queueMicrotask')) log(`  item card already extended (${card.rel})`);
-      else if (text.includes(PREV_FACTS) || text.includes(OLD_FACTS)) {
-        text = text.replace(PREV_FACTS, B_FACTS).replace(OLD_FACTS, B_FACTS);
-        log(`  upgraded ${card.rel} (item card)`);
-      } else {
-        if (!text.includes(A_CARD)) die('the inventory item card anchor was not found - aborting (nothing written)');
-        text = text.replace(A_CARD, B_CARD);
-        log(`  patched ${card.rel} (item card)`);
-      }
-      if (text.includes('cardLine?.(e)')) log(`  card meta line already applied (${card.rel})`);
-      else if (text.includes(A_META)) {
-        text = text.replace(A_META, B_META);
-        log(`  patched ${card.rel} (card meta line)`);
-      } else die('the item card meta anchor was not found - aborting (nothing written)');
+
+      /* the stat rows: our facts go right after the game's Type/Hands pair */
+      if (!text.includes('itemFacts')) {
+        const stats = CARD_STATS_RX.exec(text);
+        if (stats) {
+          const [, rowFn, model] = stats;
+          text = text.replace(CARD_STATS_RX, (all) => `${all}if(typeof globalThis<\`u\`&&globalThis.__dfoUiTweaks?.itemFacts)for(const _f of globalThis.__dfoUiTweaks.itemFacts(${model}.item))${rowFn}(_f[0],_f[1]);`);
+          log(`  patched ${card.rel} (item card facts)`);
+        } else if (text.includes(A_CARD)) {
+          text = text.replace(A_CARD, B_CARD);
+          log(`  patched ${card.rel} (item card facts)`);
+        } else {
+          die('the inventory item card stat rows were not found - aborting (nothing written)');
+        }
+      } else log(`  item card facts already applied (${card.rel})`);
+
+      /* the summary line under the name, and the card's colour key */
+      if (!text.includes('cardLine?.')) {
+        const meta = CARD_META_RX.exec(text);
+        if (meta) {
+          text = text.replace(CARD_META_RX, (all, u, model, body, W) => `${u}=globalThis.__dfoUiTweaks?.cardLine?.(${model}.item)||[${model}.material,${model}.stack?\`\${${model}.stack} of them\`:null].filter(Boolean).join(\` · \`);${u}&&${body}.append(${W}(\`p\`,\`meta\`,${u}));{const _c=${body}.closest?.(\`.card\`)||${body},_t=globalThis.__dfoUiTweaks?.tierOf?.(${model}.item);_c&&_t&&(_c.dataset.dfoTier=_t)}`);
+          log(`  patched ${card.rel} (card meta line)`);
+        } else if (text.includes(A_META)) {
+          text = text.replace(A_META, B_META);
+          log(`  patched ${card.rel} (card meta line)`);
+        } else if (text.includes(PREV_FACTS) || text.includes(OLD_FACTS)) {
+          text = text.replace(PREV_FACTS, B_FACTS).replace(OLD_FACTS, B_FACTS);
+          log(`  upgraded ${card.rel} (item card tier key)`);
+        } else {
+          die('the item card meta anchor was not found - aborting (nothing written)');
+        }
+      } else log(`  card meta line already applied (${card.rel})`);
+
       store.write(card.rel, Buffer.from(text));
       checks.push({ rel: card.rel, has: 'dataset.dfoTier' });
-      checks.push({ rel: card.rel, has: 'cardLine?.(e)' });
+      checks.push({ rel: card.rel, has: 'cardLine?.' });
     }
 
     // ---- 5. the mod itself ----------------------------------------------

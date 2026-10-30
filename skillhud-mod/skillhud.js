@@ -64,7 +64,7 @@ function normalize(c) {
   if (!c.tracked.length) return null;
   const op = c.opacity; c.opacity = typeof op === 'number' && op >= .05 && op <= 1 ? op : .92;
   c.hidden = c.hidden === true;
-  c.showLevel = c.showLevel !== false;
+  c.skillLevels = c.skillLevels !== false;
   c.rowGap = Math.min(ROW_GAP_MAX, Math.max(ROW_GAP_MIN, Math.round(c.rowGap ?? ROW_GAP_DEFAULT)));
   delete c.hideKey; // the keybind is gone; drop it from older configs
   return c;
@@ -77,7 +77,7 @@ function builtDefaults(e) {
     });
   });
   if (!picked.length) [34, 21, 17, 16, 30, 20].forEach((i) => { if (picked.indexOf(i) < 0) picked.push(i); });
-  return { tracked: picked, opacity: .92, hidden: false, showLevel: true, rowGap: ROW_GAP_DEFAULT };
+  return { tracked: picked, opacity: .92, hidden: false, skillLevels: true, rowGap: ROW_GAP_DEFAULT };
 }
 function primaryOf(e) { return e && e.career && e.career.primarySkills; }
 function majorOf(e) { return e && e.career && e.career.majorSkills; }
@@ -202,15 +202,25 @@ function entity() {
   return window.__playerEntity && window.__playerEntity.chargenDone ? window.__playerEntity : null;
 }
 
-/** The level line: the real level, and - while the game is mentoring you down
- *  to a party member - the level you actually fight at. The game itself shows
- *  only the fought-as level on the character sheet; this keeps the real one
- *  first: "104 (87)" = real 104, fighting as 87. */
-function levelLabel(e) {
-  const real = Number(e?._mentor?.realLevel ?? e?.level);
-  if (!Number.isFinite(real)) return '';
-  const fought = Number(e?._mentor?.level);
-  return Number.isFinite(fought) && fought !== real ? `${real} (${fought})` : String(real);
+/** A skill's enchantment/racial/mod bonus, the game's `yt` in wagonKinds. */
+function skillBonus(e, t) {
+  let n = e?._enchantMods?.skillMods?.[t] ?? 0;
+  for (const ef of e?.activeEffects ?? []) {
+    if (ef?.kind === 'racialOverride' && !ef.ended) n += ef.skillMods?.[t] ?? 0;
+  }
+  return n + (e?._mods?.skills?.[t] ?? 0);
+}
+
+/** The game's own skill text (wagonKinds `St` / the pause STATS grid): the
+ *  softcapped skill with bonuses, and the real value in parentheses when the
+ *  softcap is what is keeping it down - "100 (104)" for an unmastered skill
+ *  past 100, or just "87" when the two agree. */
+function skillLevelText(e, t) {
+  const raw = Number(e?.skillOverrides?.[t] ?? skillValue(e, t)) || 0;
+  const bonus = skillBonus(e, t);
+  const shown = displaySkill(e, t) + bonus;
+  const real = raw + bonus;
+  return real === shown ? String(shown) : `${shown} (${real})`;
 }
 
 /** Diagnostics for DevTools - the numbers behind one row:
@@ -222,7 +232,7 @@ export function debugSkill(t) {
 }
 
 // ------------------------------------------------------------------ HUD
-let el = null, listEl = null, headEl = null, lvEl = null, styleEl = null, timer = null;
+let el = null, listEl = null, styleEl = null, timer = null;
 let renderer = null; // per-instance row renderer (rebuilt in buildHud)
 
 /* The game's own piece boxes (.hud .hud-temp etc.), verbatim as observed:
@@ -246,18 +256,15 @@ const CSS = `
  * observed default ground above. */
 :root[data-plus-theme]:not([data-plus-theme="slate"]) #dfo-leveltracker{
   background-color:color-mix(in srgb, var(--slate,#171b21) 90%, transparent)}
-#dfo-leveltracker .lt-list{display:grid;grid-template-columns:max-content 1fr;column-gap:7px;
+#dfo-leveltracker .lt-list{display:grid;grid-template-columns:max-content 1fr max-content;column-gap:7px;
   row-gap:var(--lt-rowgap)}
-/* the level line, right-aligned over the rows (real level, then the level the
- * game fights you at while mentoring: "104 (87)") */
-#dfo-leveltracker .lt-head{display:flex;justify-content:flex-end;align-items:baseline;
-  margin:0 0 2px;color:var(--brass,#c08a3e);font-variant-numeric:tabular-nums;
-  letter-spacing:.04em;font-size:12px}
-#dfo-leveltracker .lt-head .lv{font-weight:600}
 #dfo-leveltracker .lt-row{display:contents}
 #dfo-leveltracker .lt-row .uses{font-variant-numeric:tabular-nums;
   justify-self:end;color:var(--dim,#b9b2a1)}
 #dfo-leveltracker .lt-row .nm{white-space:nowrap}
+#dfo-leveltracker .lt-row .lvl{justify-self:end;color:var(--dim,#b9b2a1);
+  font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap}
+#dfo-leveltracker.lt-no-levels .lt-row .lvl{display:none}
 #dfo-leveltracker .lt-row.ready .uses{color:var(--brass-hi,#f3cf86);font-weight:600;text-shadow:0 0 7px rgba(243,207,134,.55)}
 #dfo-leveltracker .lt-row.held .uses,#dfo-leveltracker .lt-row.held .nm{opacity:.4}
 #dfo-leveltracker .lt-none{grid-column:1/-1;color:var(--dim,#b9b2a1);font-size:12px}
@@ -309,8 +316,9 @@ function rowRenderer() {
           row.className = 'lt-row';
           const nm = document.createElement('span'); nm.className = 'nm';
           const us = document.createElement('span'); us.className = 'uses';
-          row.append(us, nm);
-          r = { row, nm, us, text: '', name: '', cls: '' };
+          const lv = document.createElement('span'); lv.className = 'lvl';
+          row.append(us, nm, lv);
+          r = { row, nm, us, lv, text: '', name: '', lvlText: '', cls: '' };
           rows.set(t, r);
         }
         order.push(r.row);
@@ -328,6 +336,8 @@ function rowRenderer() {
       const cls = 'lt-row' + (info.ready ? ' ready' : '') + (info.held ? ' held' : '');
       if (r.text !== txt) { r.us.textContent = txt; r.text = txt; }
       if (r.name !== info.name) { r.nm.textContent = info.name; r.name = info.name; }
+      const lvl = skillLevelText(e, t);
+      if (r.lvlText !== lvl) { r.lv.textContent = lvl; r.lvlText = lvl; }
       if (r.cls !== cls) { r.row.className = cls; r.cls = cls; }
     }
   };
@@ -341,14 +351,7 @@ function buildHud() {
   el.id = 'dfo-leveltracker';
   el.classList.add('dfo-lt');
   // no title line: the panel is a piece of the game's HUD (the Alt+U editor
-  // names it "Skill tracker"), and its rows are self-explanatory. The level
-  // line on the right is optional (Show level in the Mods pane).
-  headEl = document.createElement('div');
-  headEl.className = 'lt-head';
-  lvEl = document.createElement('span');
-  lvEl.className = 'lv';
-  headEl.appendChild(lvEl);
-  el.appendChild(headEl);
+  // names it "Skill tracker"), and its rows are self-explanatory
   listEl = document.createElement('div');
   listEl.className = 'lt-list';
   el.appendChild(listEl);
@@ -500,14 +503,8 @@ function render() {
   syncParent();
   place();
   if (rowGapCache !== cfg.rowGap) { rowGapCache = cfg.rowGap; el.style.setProperty('--lt-rowgap', cfg.rowGap + 'px'); }
+  el.classList.toggle('lt-no-levels', cfg.skillLevels === false);
   const e = entity();
-  if (headEl) {
-    const show = cfg.showLevel !== false;
-    const head = show ? 'flex' : 'none';
-    if (headEl.style.display !== head) headEl.style.display = head;
-    const text = show ? levelLabel(e) : '';
-    if (lvEl && lvEl.textContent !== text) lvEl.textContent = text;
-  }
   renderer(listEl, e, e ? cfg.tracked.slice().sort((a, b) => a - b) : []);
 }
 
@@ -549,11 +546,11 @@ export function mountPane(container) {
   opWrap.append(op, opLabel);
   row('Panel opacity', opWrap);
 
-  // the level line on the right of the panel ("104 (87)" while mentoring)
+  // skill level on each row (the game's own "100 (104)" text)
   const lv = document.createElement('input'); lv.type = 'checkbox';
-  lv.checked = cfg.showLevel !== false;
-  lv.onchange = () => { cfg.showLevel = lv.checked; save(); render(); };
-  row('Show level', lv);
+  lv.checked = cfg.skillLevels !== false;
+  lv.onchange = () => { cfg.skillLevels = lv.checked; save(); render(); };
+  row('Skill levels', lv);
 
   // px between rows: 0 = fully packed, 10 = airy
   const gap = document.createElement('input'); gap.type = 'range'; gap.min = String(ROW_GAP_MIN); gap.max = String(ROW_GAP_MAX);

@@ -189,11 +189,10 @@ Everything is in the game's **ESC (pause) menu → Mods** (Enhanced skin):
 - **Reload all** sits on the right of the footer bar (the footer carries the
   credit and the repo link on the left).
 - Each mod's band holds its settings. For **Skill Tracker**: panel opacity
-  (with its percentage), **Show level** (the character's level on the right;
-  while the game is mentoring you down to a party member it reads
-  `104 (87)` — real level, then the level you fight at), row spacing,
-  **Show/Hide panel**, reset placement, and the tracked-skill checklist (three
-  columns when the pane is wide enough, two when it is not).
+  (with its percentage), **Skill levels** (each row's skill value in the game's
+  own text — `32`, or `100 (104)` when the softcap is holding it down), row
+  spacing, **Show/Hide panel**, reset placement, and the tracked-skill
+  checklist (three columns when the pane is wide enough, two when it is not).
 
 A reload re-reads the registry: a mod whose `MOD_BUILD` changed is unmounted
 and replaced; a mod removed from the registry is unloaded; an unchanged import
@@ -318,9 +317,10 @@ dims: 100 for an unmastered skill, 200 under **Master Skills**. It reads the
 same character data the game's own skill screens show.
 
 The panel carries no title line — it is a piece of the HUD, and the Alt+U
-editor names it "Skill tracker". An optional **Show level** line sits on the
-right above the rows: your level, and while the game is mentoring you down to a
-party member, the level you actually fight at — `104 (87)`.
+editor names it "Skill tracker". An optional **Skill levels** column sits on
+the right of each row, using the game's own skill text: the value, and in
+parentheses the real value when the softcap is holding it down (`100 (104)`
+for an unmastered skill past 100).
 
 The panel uses the game's own `:root` design tokens (`--bone`, `--dim`,
 `--brass`, `--brass-hi`, `--dfo-text-font`) with classic-skin fallbacks, so it

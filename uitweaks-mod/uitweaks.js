@@ -37,6 +37,30 @@ const SLOT_LABELS = {
   23: 'Legs', 24: 'Legs', 26: 'Feet',
 };
 
+/* Clothing/jewellery template index -> slot, from the game's own equip table
+ * (the same one the paper doll uses). Ground and pack items usually have no
+ * `equipSlot` - only worn ones do - so the template is the reliable key. */
+const CLOTHING_SLOTS = {
+  141: 'Chest', 142: 'Chest', 143: 'Chest', 144: 'Chest', 145: 'Chest', 146: 'Chest',
+  157: 'Chest', 158: 'Chest', 159: 'Chest', 160: 'Chest', 161: 'Chest', 163: 'Chest',
+  164: 'Chest', 165: 'Chest', 166: 'Chest', 167: 'Chest', 168: 'Chest', 169: 'Chest',
+  170: 'Chest', 171: 'Chest', 172: 'Chest', 173: 'Chest', 176: 'Chest', 177: 'Chest',
+  178: 'Chest', 179: 'Chest', 180: 'Chest', 181: 'Chest',
+  147: 'Feet', 148: 'Feet', 149: 'Feet', 150: 'Feet',
+  151: 'Legs', 152: 'Legs', 153: 'Legs', 156: 'Legs', 162: 'Legs', 174: 'Legs', 175: 'Legs',
+  154: 'Cloak', 155: 'Cloak',
+  182: 'Chest', 183: 'Chest', 184: 'Chest', 185: 'Chest', 194: 'Chest', 195: 'Chest',
+  196: 'Chest', 197: 'Chest', 198: 'Chest', 200: 'Chest', 201: 'Chest', 202: 'Chest',
+  203: 'Chest', 204: 'Chest', 205: 'Chest', 206: 'Chest', 207: 'Chest', 208: 'Chest',
+  209: 'Chest', 214: 'Chest', 215: 'Chest', 210: 'Chest', 216: 'Chest',
+  186: 'Feet', 187: 'Feet', 188: 'Feet', 189: 'Feet',
+  190: 'Legs', 193: 'Legs', 199: 'Legs', 211: 'Legs', 212: 'Legs', 213: 'Legs',
+  191: 'Cloak', 192: 'Cloak',
+  133: 'Amulet', 138: 'Amulet', 139: 'Amulet',
+  134: 'Bracer', 135: 'Ring', 136: 'Bracelet', 137: 'Mark',
+};
+const WEARABLE_GROUPS = new Set(['MensClothing', 'WomensClothing', 'Clothing', 'Jewellery']);
+
 /* Weapon template indices (the game's own table: Dagger 113 ... Arrow 131).
  * These are Daggerfall's canonical item ids, so an artifact or a renamed
  * weapon still reports the right skill; the name map below covers modded
@@ -207,8 +231,11 @@ function tierNumber(item) {
 /** The slot a cosmetic/wearable goes to (clothing, jewellery, marks...), or
  *  null when the item is not worn. */
 function slotLabel(item) {
+  if (!item) return null;
   const slot = Number(item?.equipSlot);
-  return Number.isInteger(slot) ? SLOT_LABELS[slot] ?? null : null;
+  if (Number.isInteger(slot) && SLOT_LABELS[slot]) return SLOT_LABELS[slot];
+  if (!WEARABLE_GROUPS.has(String(item.group ?? ''))) return null;
+  return CLOTHING_SLOTS[Number(item.templateIndex)] ?? null;
 }
 function typeOf(item) {
   if (!item) return null;

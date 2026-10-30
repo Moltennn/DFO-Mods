@@ -104,17 +104,32 @@ function exposePileManager(text) {
  * the mod can hide a corpse whose items are all filtered. */
 function exposeFoeManager(text) {
   if (text.includes('__dfoFoes=')) return { text, changed: false };
-  const A = '=pLe({oneVoice:';
-  if (!text.includes(A)) return { text, missing: true };
-  return { text: text.replace(A, '=globalThis.__dfoFoes=pLe({oneVoice:'), changed: true };
+  const RX = /([A-Za-z0-9_$]+)=([A-Za-z0-9_$]+)\(\{oneVoice:/;
+  const m = text.match(RX);
+  if (!m) return { text, missing: true };
+  return { text: text.replace(RX, `${m[1]}=globalThis.__dfoFoes=${m[2]}({oneVoice:`), changed: true };
 }
 
-/* The corpse body is drawn by the foe renderer: a dead foe with a corpse is
- * "stood" as a foe body. Skip that draw when the filter hides the whole body. */
-const CORPSE_RX = /([A-Za-z0-9_$]+)\.dead&&\1\.corpse&&!\1\.corpseDestroyed&&/;
-const A_MARK = 'i.pixelKey=e.corpsePixelKey=t';
-const A_DRAWLIST = 'return[...o,...ne.map(e=>e.batch),...ie.batches()]';
-const B_DRAWLIST = 'return[...o,...ne.filter(e=>!(e.dfoFoe&&globalThis.__dfoRowFilter?.hideCorpse?.(e.dfoFoe))).map(e=>e.batch),...ie.batches()]';
+/* Corpses: the foe renderers "stand" a dead foe's body as a corpse and draw a
+ * separate billboard sprite for it. A build can carry more than one renderer
+ * (world / interior / remote), so every corpse shape is patched, not the first:
+ *
+ *   stand   `X.dead&&X.corpse&&[!X.corpseDestroyed&&]<fn>(X)&&X.ai&&(Y.stand(`
+ *           the corpse's body draw - skipped when the filter hides the body
+ *   marker  `M.pixelKey=X.corpsePixelKey=K` - the corpse sprite remembers its foe
+ *   batch   `X.corpseBatch=B,<B>.castOnly=` - the other renderer's corpse sprite
+ *   lists   `...[<list>.map(e=>e.batch)]` and `for(let e of <list>)e.castOnly||`
+ *
+ * Every anchor is a shape the corpse code always has; the minified names around
+ * it are captured, never hardcoded. */
+const HIDDEN = (x) => `!(globalThis.__dfoRowFilter?.hideCorpse?.(${x}))&&`;
+const DRAWN = (x) => `(${x}.dfoFoe&&globalThis.__dfoRowFilter?.hideCorpse?.(${x}.dfoFoe))`;
+const CORPSE_PROBE = /([A-Za-z0-9_$]+)\.dead&&\1\.corpse&&/;
+const CORPSE_RX = /([A-Za-z0-9_$]+)\.dead&&\1\.corpse&&(?:!\1\.corpseDestroyed&&)?[A-Za-z0-9_$]+\(\1\)&&\1\.ai&&\([A-Za-z0-9_$]+\.stand\(/g;
+const MARK_RX = /([A-Za-z0-9_$]+)\.pixelKey=([A-Za-z0-9_$]+)\.corpsePixelKey=([A-Za-z0-9_$]+)(?!,\1\.dfoFoe=)/g;
+const BATCH_RX = /([A-Za-z0-9_$]+)\.corpseBatch=([A-Za-z0-9_$]+),(?!\2\.dfoFoe=)(?=[A-Za-z0-9_$]+\.castOnly)/g;
+const LIST_RX = /\.\.\.([A-Za-z0-9_$]+)\.map\(e=>e\.batch\)/g;
+const BATCHLIST_RX = /for\(let ([A-Za-z0-9_$]+) of ([A-Za-z0-9_$]+)\)\1\.castOnly\|\|([A-Za-z0-9_$]+)\.push\(\1\)/g;
 
 /* ------------------------------------------------------- the row hook */
 /* The row builder's item name is the one stable shape (`name:<fn>(e).name||
@@ -213,29 +228,46 @@ function installNow() {
       checks.push({ rel: rows.rel, has: ROW_HOOK });
     }
 
-    // ---- 3. the corpse body draw ----------------------------------------
+    // ---- 3. the corpse body + sprite draws ------------------------------
     {
-      const bodies = store.findChunk({ test: (t) => t.includes('hideCorpse') || CORPSE_RX.test(t) });
+      const bodies = store.findChunk({ test: (t) => t.includes('hideCorpse') || CORPSE_PROBE.test(t) });
       if (!bodies) deferOrDie('the foe-body renderer was not found and the bundled build is not readable - start the game, then retry', seed);
       let text = bodies.text;
-      if (text.includes('hideCorpse')) log(`  corpse body guard already applied (${bodies.rel})`);
-      else {
-        const m = text.match(CORPSE_RX);
-        if (!m) die('the corpse body draw anchor was not found - aborting (nothing written)');
-        text = text.replace(CORPSE_RX, `${m[1]}.dead&&${m[1]}.corpse&&!${m[1]}.corpseDestroyed&&!(globalThis.__dfoRowFilter?.hideCorpse?.(${m[1]}))&&`);
-        log(`  patched ${bodies.rel} (corpse body draw)`);
+
+      /* the body draw: one guard per renderer */
+      const stands = [...text.matchAll(CORPSE_RX)].length;
+      if (!stands && text.includes('.dead&&') && !text.includes('hideCorpse')) {
+        die('the corpse body draw anchor was not found - aborting (nothing written)');
       }
-      /* the corpse's own billboard sprite: tag it with its foe and skip it in the draw list */
-      if (!text.includes('i.dfoFoe=e')) {
-        if (!text.includes(A_MARK)) die('the corpse marker anchor was not found - aborting (nothing written)');
-        text = text.replace(A_MARK, `${A_MARK},i.dfoFoe=e`);
-        log(`  patched ${bodies.rel} (corpse marker tagged)`);
+      if (stands) {
+        text = text.replace(CORPSE_RX, (m, foe) => m.replace(`${foe}.dead&&${foe}.corpse&&`, `${foe}.dead&&${foe}.corpse&&${HIDDEN(foe)}`));
+        log(`  patched ${bodies.rel} (corpse body draw, ${stands})`);
+      } else log(`  corpse body guard already applied (${bodies.rel})`);
+
+      /* the corpse's billboard sprite: remember its foe... */
+      const marks = [...text.matchAll(MARK_RX)].length;
+      const batches = [...text.matchAll(BATCH_RX)].length;
+      if (!marks && !batches && !text.includes('.dfoFoe=')) {
+        die('the corpse sprite anchor was not found - aborting (nothing written)');
       }
-      if (!text.includes('.dfoFoe&&globalThis.__dfoRowFilter')) {
-        if (!text.includes(A_DRAWLIST)) die('the corpse sprite draw list was not found - aborting (nothing written)');
-        text = text.replace(A_DRAWLIST, B_DRAWLIST);
-        log(`  patched ${bodies.rel} (corpse sprite hidden)`);
+      if (marks) text = text.replace(MARK_RX, (m, marker, foe) => `${m},${marker}.dfoFoe=${foe}`);
+      if (batches) text = text.replace(BATCH_RX, (m, foe, batch) => `${m}${batch}.dfoFoe=${foe},`);
+      if (marks || batches) log(`  patched ${bodies.rel} (corpse sprite tagged, ${marks + batches})`);
+
+      /* ...and skip it in every draw list it appears in */
+      const lists = [...text.matchAll(LIST_RX)].length;
+      const coralists = [...text.matchAll(BATCHLIST_RX)].length;
+      if (!lists && !coralists && !/\.dfoFoe&&globalThis\.__dfoRowFilter\?\.hideCorpse\?\.\(/.test(text)) {
+        die('the corpse sprite draw list was not found - aborting (nothing written)');
       }
+      if (lists) {
+        text = text.replace(LIST_RX, (m, arr) => `...${arr}.filter(e=>!${DRAWN('e')}).map(e=>e.batch)`);
+      }
+      if (coralists) {
+        text = text.replace(BATCHLIST_RX, (m, el, arr, out) => `for(let ${el} of ${arr})(${el}.castOnly||${DRAWN(el)})||${out}.push(${el})`);
+      }
+      if (lists || coralists) log(`  patched ${bodies.rel} (corpse sprite hidden, ${lists + coralists})`);
+
       store.write(bodies.rel, Buffer.from(text));
       checks.push({ rel: bodies.rel, has: 'hideCorpse' });
     }

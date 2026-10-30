@@ -1,10 +1,14 @@
 /*
- * DFO Online - UI Tweaks: item tier labels in the world plaque (loot piles).
+ * DFO Online - UI Tweaks: readable loot, in the plaque and the item card.
  *
- * The game builds the crosshair plaque's item rows in propBodies-*.js; the
- * installer adds one call into that row builder (and one attribute in the
- * plaque renderer) so this module can name and colour each row. Nothing here
- * touches game data: it reads the item object the game already hands over.
+ * Installer hooks (all read-only):
+ *   - propBodies-*.js      row label/tier, the shared row-filter hook line,
+ *                          and the "empty pile" model guard
+ *   - deepWaterRuntime-*.js  data-tier on the row (the style keys off it)
+ *   - enhancedInventory-*.js the card's summary line and its data-dfo-tier
+ *
+ * Nothing here touches game data: it reads the item object the game already
+ * hands over.
  *
  * Label:  T3 . Iron Saber . Long Blade
  *   T<n>   the item's tier in the Daggerfall material order: Leather 1,

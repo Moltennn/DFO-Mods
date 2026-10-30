@@ -3,12 +3,19 @@
  * DFO Online - UI Tweaks installer.
  *
  * A MOD installer: it assumes the shared loader (../modloader) and asks it to
- * install itself first. It owns exactly its own patches:
+ * install itself first. It patches:
  *
- *   assets/propBodies-*.js       the plaque's item rows (label + tier)
+ *   assets/propBodies-*.js       the plaque's item rows (label + tier), the
+ *                                shared row-filter hook and the "empty pile"
+ *                                model guard, and the row framer's row count
  *   assets/deepWaterRuntime-*.js the plaque renderer (data-tier attribute)
+ *   assets/enhancedInventory-*.js the item card (summary line, extra facts,
+ *                                data-dfo-tier colour key)
  *   assets/dfo-uitweaks.js       the mod
  *   assets/dfo-mods/registry.js  one entry pointing at the mod
+ *
+ * Chunk files shared with other mod installers are recorded as content checks
+ * (not whole-file hashes), so either installer can write them last.
  *
  *   node install.mjs                 install/repair
  *   node install.mjs --if-needed     check first

@@ -229,11 +229,12 @@ where `boot.js` also lives). A mod module exports:
 | `unmount()` | remove everything `install()` added |
 | `mountPane(container)` | optional; the loader gives it its own section in ESC → Mods |
 
-The Mods pane renders one band per mod, headed with the registry `name` and
-the module's loaded `MOD_BUILD`. Reloads use the same lifecycle: unmount,
-re-import, install. The pane scrolls in
-its own well (the game's window around it does not move), and its footer carries
-the credit, the repo link and the loaded `MOD_BUILD` hashes.
+The Mods pane renders one band per mod, headed with the registry `name`, the
+module's loaded `MOD_BUILD` and a Reload button, divided by the same rule as
+the footer. Reloads use the same lifecycle: unmount, re-import, install. The
+pane scrolls in its own well (the game's window around it does not move); the
+footer keeps the credit and repo link on the left and **Reload all** on the
+right.
 
 ### Adding a mod
 
@@ -445,13 +446,10 @@ names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
    row count from the mod instead of the fixed 6, and the item-model builders
    return nothing when the filter removed every row of a non-empty pile (the
    plaque disappears instead of showing just its title).
-4. `assets/world-*.js` — exposes the dropped-pile manager as `__dfoPiles` so the
-   mod can put a fully filtered pile to sleep (`inactive`), hiding its sprite and
-   its plaque; the items stay in the pile.
-5. `assets/enhancedInventory-*.js` — the card's line under the name asks
+4. `assets/enhancedInventory-*.js` — the card's line under the name asks
    `__dfoUiTweaks.cardLine(item)` (tier · material · type), its stat list asks
    `__dfoUiTweaks.itemFacts(item)` for the remaining extra rows, and the card is
-   tagged with `data-dfo-tier` so the stylesheet colours the name and the line.
+   tagged with `data-dfo-tier` so the stylesheet colours the line.
 5. `assets/dfo-uitweaks.js` — the mod itself (the label/type/material logic,
    the card facts, the settings and the stylesheet).
 
@@ -465,9 +463,11 @@ written.
 
 ## Loot Filter
 
-A separate mod that hides junk from the world plaque. It is **display-only**:
-Take all and the container window still see every item, and quest items are
-never hidden. Rules combine as "hide if any matches":
+A separate mod that hides junk from the world plaque. Rules combine as "hide if
+any matches"; quest items are never hidden. Hidden items never reach the
+plaque, and a pile/corpse with nothing left to show is put to sleep
+(`inactive` / `corpseDisabled`) so it leaves the world's sprites and the loot
+targets too — nothing is ever deleted, and clearing the rule wakes it intact.
 
 - **Enable loot filter** — the master switch.
 - **Hide types** — weapons, armor, gems, clothing, ingredients, misc, books,
@@ -487,7 +487,9 @@ plaque refreshes (look away and back).
 
 A pile is hidden **as a whole**: if every item in it is filtered out and the
 pile was not actually empty, the plaque does not appear at all (no title with an
-empty list) and the **3-D pile of items on the ground is hidden too**. The drop
+empty list) and the **3-D pile of items on the ground is hidden too**. (The
+plaque half is the "empty pile" guard that UI Tweaks' installer puts in the
+item-model builders; the pile/corpse sprites and targets are this mod's.) The drop
 is only put to sleep (`inactive` on the dropped-pile manager), never deleted:
 its items are untouched, and it wakes up — sprite, plaque and all — as soon as
 the filter lets one of them through or is turned off. While hidden it is out of

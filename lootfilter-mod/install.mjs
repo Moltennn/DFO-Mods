@@ -3,12 +3,15 @@
  * DFO Online - Loot Filter installer.
  *
  * A MOD installer: it assumes the shared loader (../modloader) and asks it to
- * install itself first. It owns exactly its own pieces:
+ * install itself first. It patches:
  *
- *   assets/propBodies-*.js      the generic row-filter hook (kept idempotent so
- *                               UI Tweaks and this mod can both guarantee it)
- *   assets/dfo-lootfilter.js    the mod (rules + ESC pane)
- *   assets/dfo-mods/registry.js one entry pointing at the mod
+ *   assets/propBodies-*.js       the shared row-filter hook (idempotent - UI
+ *                                Tweaks installs the same line)
+ *   assets/world-*.js            exposes the dropped-pile manager (__dfoPiles)
+ *                                and the foe manager (__dfoFoes)
+ *   assets/deepWaterRuntime-*.js the corpse body + corpse-sprite draw guards
+ *   assets/dfo-lootfilter.js     the mod (rules + ESC pane)
+ *   assets/dfo-mods/registry.js  one entry pointing at the mod
  *
  *   node install.mjs                 install/repair
  *   node install.mjs --if-needed     check first

@@ -1,13 +1,16 @@
 /*
  * DFO Online - Loot Filter: player-defined junk for the world plaque.
  *
- * The game builds the crosshair plaque's item rows in propBodies-*.js. The
- * row builder calls `globalThis.__dfoRowFilter.keep(item)` for every item in a
- * pile (UI Tweaks installs that one hook line; either installer guarantees it),
- * so this mod owns the rules and the settings, and nothing else.
+ * The game builds the crosshair plaque's item rows in propBodies-*.js. The row
+ * builder asks `__dfoRowFilter.keep(item)` (the hook line is shared with UI
+ * Tweaks; either installer guarantees it), the plaque model guard removes a
+ * pile whose rows are all gone, and this module also sleeps fully hidden
+ * ground piles and corpses so their sprites disappear.
  *
- * Display-only: the row never reaches the plaque, but Take all and the
- * container window still see every item. Quest items are never hidden.
+ * The filter is display-first: it never deletes items. A hidden pile or corpse
+ * is only taken out of the plaque/targets (inactive / corpseDisabled), so it
+ * cannot be grabbed while hidden - clear the rule and it is back intact.
+ * Quest items are never hidden.
  */
 'use strict';
 
@@ -142,10 +145,6 @@ export function keep(item) {
 let pileTimer = null;
 const hiddenByUs = new WeakSet();
 
-function allFiltered(items) {
-  if (!cfg?.on || !Array.isArray(items) || !items.length) return false;
-  return items.every((item) => !keep(item));
-}
 /* Corpses are dead foes; their loot target and hover name hang off
  * `corpseDisabled`, so a fully filtered body stops being offered (the item
  * model then hides its plaque as usual). */
@@ -168,7 +167,7 @@ function syncPiles() {
     if (!pile || pile.dead) continue;
     const items = pile.items;
     if (!Array.isArray(items) || !items.length) continue;
-    const hide = allFiltered(items);
+    const hide = hideItems(items);
     if (hide && !pile.inactive) {
       pile.inactive = true;
       hiddenByUs.add(pile);
@@ -181,7 +180,7 @@ function syncPiles() {
 }
 
 /** Nothing on the body would be shown: it is empty, or every item is filtered. */
-export function hideItems(items) {
+function hideItems(items) {
   if (!cfg?.on) return false;
   if (!Array.isArray(items) || items.length === 0) return true;
   return items.every((item) => !keep(item));

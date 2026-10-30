@@ -406,7 +406,12 @@ type:
   Axe/both bows. Artifact templates follow the game's special cases (560 two,
   562/563 one); unknown added weapons fall back to the name.
 - Armor shows the class the game's own item sheet calls **Type**: Leather,
-  Chain or Plate.
+  Chain or Plate. It also says where it goes, from the game's own equip table:
+  **Chest** (cuirass/plate), **Hands** (gauntlets), **Legs** (greaves),
+  **Left arm** / **Right arm** (pauldrons), **Head** (helms), **Feet** (boots)
+  and **Shield** (buckler, round, kite, tower) — `Steel Buckler · Plate ·
+  Shield`, `Chain Greaves · Legs`. The slot is skipped when the name already
+  says it (`Tower Shield`, `Warden-Plate`).
 - Cosmetic/wearable items show the slot they go to: **Head, Chest, Legs, Feet,
   Gloves, Cloak, Ring, Amulet, Bracelet, Bracer, Mark, Crystal** — e.g.
   `Short Tunic · Chest`, `Casual Pants · Legs`, `The Vestments of Stendarr ·

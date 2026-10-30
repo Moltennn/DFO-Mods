@@ -267,6 +267,25 @@ function slotLabel(item) {
   if (!WEARABLE_GROUPS.has(String(item.group ?? ''))) return null;
   return CLOTHING_SLOTS[Number(item.templateIndex)] ?? null;
 }
+
+/* Armour's own slot, from the game's equip table (`equipRules` Armor):
+ * 102 Chest, 103 Hands, 104 Legs, 105/106 arms, 107 Head, 108 Feet,
+ * 109-112 shields. A worn item's equipSlot is the fallback for added armour. */
+const ARMOR_SLOTS = {
+  102: 'Chest', 103: 'Hands', 104: 'Legs', 105: 'Left arm', 106: 'Right arm',
+  107: 'Head', 108: 'Feet',
+  109: 'Shield', 110: 'Shield', 111: 'Shield', 112: 'Shield',
+};
+function armorSlot(item) {
+  if (!item || item.group !== 'Armor') return null;
+  const byIndex = ARMOR_SLOTS[Number(item.templateIndex)];
+  if (byIndex) return byIndex;
+  const slot = Number(item.equipSlot);
+  if (!Number.isInteger(slot)) return null;
+  if (slot === 19 || slot === 21) return 'Shield';
+  if (slot === 20) return 'Hands';
+  return SLOT_LABELS[slot] ?? null;
+}
 function typeOf(item) {
   if (!item) return null;
   if (item.group === 'Armor') return armorClass(item);
@@ -340,6 +359,10 @@ export function lootLabel(item, gameName = null) {
    * (Formal Cloak ... cloak, Longsword ... long blade, Battle Axe ... axe);
    * with the switch off every item prints its type. */
   if (type && !(cfg.hideObvious && obviousType(name, type))) parts.push(type);
+  /* Armour also says where it goes: Buckler/Shield, Greaves/Legs, Helm/Head...
+   * skipped when the name already says it (Tower Shield). */
+  const slot = armorSlot(item);
+  if (slot && !hasWord(name, norm(slot))) parts.push(slot);
   /* Weapons also say whether they take one hand or two; ammo and non-weapons
    * stay plain. */
   const hands = cfg.hands === false ? null : handsOf(item);

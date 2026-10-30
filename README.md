@@ -546,8 +546,7 @@ targets too — nothing is ever deleted, and clearing the rule wakes it intact.
 
 - **Enable loot filter** — the master switch.
 - **Hide types** — weapons, armor, gems, clothing, ingredients, misc, books,
-  ammo. **Books** includes the Holy Tome (which the game files under
-  ReligiousItems) and any item named like a book/tome/codex/grimoire.
+  ammo.
 - **Hide all commons** — anything with no rarity at all.
 - **Hide commons below tier** — commons under the DFO material tier you pick
   (4 hides Leather/Chain/Iron commons, keeps Steel and up).

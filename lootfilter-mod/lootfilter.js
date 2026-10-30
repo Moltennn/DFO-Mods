@@ -18,7 +18,7 @@ export const MOD_BUILD = '@BUILD@';
 
 const STORE_KEY = 'dfoLootFilter.config.v1';
 
-const FILTER_TYPES = ['weapons', 'armor', 'gems', 'clothing', 'ingredients', 'misc', 'books', 'ammo'];
+const FILTER_TYPES = ['weapons', 'armor', 'gems', 'clothing', 'ingredients', 'misc', 'books', 'religious', 'ammo'];
 const RARITY_RANK = { common: 0, magic: 1, rare: 2, legendary: 3, artifact: 4, aetheric: 5, gilded: 5 };
 
 /* Ammo and the Daggerfall material order (Leather 1, Chain 2, Iron 3 ...
@@ -127,6 +127,7 @@ function categoryOf(item) {
   if (group === 'Weapons') return 'weapons';
   if (group === 'Armor') return 'armor';
   if (group === 'Books') return 'books';
+  if (group === 'ReligiousItems') return 'religious';
   return 'misc';
 }
 

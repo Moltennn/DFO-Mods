@@ -546,7 +546,8 @@ targets too — nothing is ever deleted, and clearing the rule wakes it intact.
 
 - **Enable loot filter** — the master switch.
 - **Hide types** — weapons, armor, gems, clothing, ingredients, misc, books,
-  ammo.
+  religious items, ammo. Religious items are the game's own `ReligiousItems`
+  group: prayer beads, symbols, candles, the Holy Tome, and so on.
 - **Hide all commons** — anything with no rarity at all.
 - **Hide commons below tier** — commons under the DFO material tier you pick
   (4 hides Leather/Chain/Iron commons, keeps Steel and up).

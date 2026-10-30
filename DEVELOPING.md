@@ -216,6 +216,12 @@ Label internals:
   the material word (leather/chain) is not repeated on the card.
 - Gems: template 0 Ruby … 7 Amber, 77 Pearl; graded gems `1900 + grade*8 + stone`
   with the grade word already in the name. Coloured by stone, no dot.
+- Quest items (`item.questItem`) are their own colour key: `lootTier` returns
+  `quest` (not a material slug), the row label is `Quest: <name>`, and the same
+  key reaches the card's `data-dfo-tier`, so the card's "Quest item" boundline
+  goes magenta `#F873FF` (below the name only - the name and meta line stay ordinary). The
+  `quests` switch (default on) gates it on its own, independent of `labels`. In game a magic item may carry
+  only `rarity: 'magic'`; a quest item is marked by `questItem` regardless.
 
 Classic palette (the Bright palette is the same tiers in lighter colours):
 
@@ -265,7 +271,10 @@ Patches:
 4. `assets/deepWaterRuntime-*.js` — the corpse body draw and the corpse's
    billboard sprite ask `__dfoRowFilter.hideCorpse(foe)`; the sprite is tagged
    with its foe at creation. The installer patches every corpse renderer
-   (world/interior/remote) by shape.
+   (world/interior/remote) by shape. A hidden corpse's marker batch is also
+   marked `castOnly` at the start of each renderer's corpse loop: the body is
+   skipped, and the game only suppresses the marker while it stands the body,
+   so without this an emptied body was left showing its sprite.
 5. `assets/dfo-lootfilter.js` — the mod.
 
 Runtime pieces:

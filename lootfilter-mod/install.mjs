@@ -123,6 +123,11 @@ function exposeFoeManager(text) {
  * Every anchor is a shape the corpse code always has; the minified names around
  * it are captured, never hardcoded. */
 const HIDDEN = (x) => `!(globalThis.__dfoRowFilter?.hideCorpse?.(${x}))&&`;
+/* A hidden corpse's body is skipped above, but its corpse marker (the sprite
+ * drawn at distance / after looting) would then sit there alone - the game
+ * only suppresses it while it stands the 3D body. Stop drawing it too. */
+const NO_SPRITE = (x) => `${x}.corpseMarker?.batch&&globalThis.__dfoRowFilter?.hideCorpse?.(${x})&&(${x}.corpseMarker.batch.castOnly=!0),`
+  + `${x}.corpseBatch&&globalThis.__dfoRowFilter?.hideCorpse?.(${x})&&(${x}.corpseBatch.castOnly=!0),`;
 const DRAWN = (x) => `(${x}.dfoFoe&&globalThis.__dfoRowFilter?.hideCorpse?.(${x}.dfoFoe))`;
 const CORPSE_PROBE = /([A-Za-z0-9_$]+)\.dead&&\1\.corpse&&/;
 const CORPSE_RX = /([A-Za-z0-9_$]+)\.dead&&\1\.corpse&&(?:!\1\.corpseDestroyed&&)?[A-Za-z0-9_$]+\(\1\)&&\1\.ai&&\([A-Za-z0-9_$]+\.stand\(/g;
@@ -281,7 +286,7 @@ function installNow() {
         die('the corpse body draw anchor was not found - aborting (nothing written)');
       }
       if (stands) {
-        text = text.replace(CORPSE_RX, (m, foe) => m.replace(`${foe}.dead&&${foe}.corpse&&`, `${foe}.dead&&${foe}.corpse&&${HIDDEN(foe)}`));
+        text = text.replace(CORPSE_RX, (m, foe) => m.replace(`${foe}.dead&&${foe}.corpse&&`, `${NO_SPRITE(foe)}${foe}.dead&&${foe}.corpse&&${HIDDEN(foe)}`));
         log(`  patched ${bodies.rel} (corpse body draw, ${stands})`);
       } else log(`  corpse body guard already applied (${bodies.rel})`);
 

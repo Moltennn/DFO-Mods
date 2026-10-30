@@ -146,6 +146,37 @@ function ensureRowFilter(text) {
   return { text, changed: false, missing: true };
 }
 
+/* Quick-loot took `items[selectedRow]` from the pile's unfiltered list. Once
+ * rows are filtered that index lands on a different (hidden) item, so make the
+ * selection ask the filter for the visible row's own item first; the raw
+ * lookup stays as the fallback for non-item plaques. Anchor: the selected-row
+ * lookup `Gf(items, state.row, 1/0)`. */
+const PICK_HOOK = 'globalThis.__dfoRowFilter?.pick?.(';
+const PICK_RX = /([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+),([A-Za-z0-9_$]+)\.row,1\/0\)/;
+function ensureTakePick(text) {
+  if (text.includes(PICK_HOOK)) return { text, changed: false };
+  const m = text.match(PICK_RX);
+  if (!m) return { text, changed: false, missing: true };
+  return {
+    text: text.replace(PICK_RX, (all, fn, items, state) => `${PICK_HOOK}${state})??${all}`),
+    changed: true,
+  };
+}
+
+/* 0.1.13520 keeps the quick-loot selection as `{key,row,id}` - not the plaque
+ * model - so `pick(fp)` cannot see the row's item. Carry it on that state when
+ * the model updates: `dfoItem` is ignored by the game's own comparisons. */
+const QUICK_RX = /return ([A-Za-z0-9_$]+)==null\?\{key:([A-Za-z0-9_$]+)\.key,row:([A-Za-z0-9_$]+)\}:\{key:\2\.key,row:\3,id:\1\}/;
+function ensureQuickState(text) {
+  if (text.includes('dfoItem:')) return { text, changed: false };
+  const m = text.match(QUICK_RX);
+  if (!m) return { text, changed: false, missing: true }; // older build: the plaque state itself
+  return {
+    text: text.replace(QUICK_RX, (all, id, model, row) => `return ${id}==null?{key:${model}.key,row:${row},dfoItem:${model}.rows?.[${row}]?.item}:{key:${model}.key,row:${row},id:${id},dfoItem:${model}.rows?.[${row}]?.item}`),
+    changed: true,
+  };
+}
+
 /* ----------------------------------------------------------------- check */
 function checkInstalled() {
   const { state, target } = inspectTarget();
@@ -217,15 +248,25 @@ function installNow() {
     // ---- 2. the row-filter hook in the plaque's row builder -------------
     {
       const rows = store.findChunk({
-        test: (t) => ROW_RX.test(t) || t.includes('lootLabel') || t.includes(ROW_HOOK),
+        test: (t) => ROW_RX.test(t) || t.includes('lootLabel') || t.includes(ROW_HOOK) || t.includes(PICK_HOOK),
       });
       if (!rows) deferOrDie('the plaque row chunk was not found and the bundled build is not readable - start the game, then retry', seed);
       const hook = ensureRowFilter(rows.text);
       if (hook.missing) die('the plaque row filter anchor was not found - aborting (nothing written)');
       if (hook.changed) log(`  patched ${rows.rel} (row filter hook)`);
       else log(`  row filter hook already present (${rows.rel})`);
-      store.write(rows.rel, Buffer.from(hook.text));
+      const take = ensureTakePick(hook.text);
+      if (take.missing) die('the quick-loot selection anchor was not found - aborting (nothing written)');
+      if (take.changed) log(`  patched ${rows.rel} (quick-loot uses the selected row's item)`);
+      else log(`  quick-loot row pick already present (${rows.rel})`);
+      const quick = ensureQuickState(take.text);
+      if (quick.missing) log(`  quick-loot state carries no row item (older build) - plaque-state pick used`);
+      else if (quick.changed) log(`  patched ${rows.rel} (quick-loot state carries the selected item)`);
+      else log(`  quick-loot state already carries the selected item (${rows.rel})`);
+      store.write(rows.rel, Buffer.from(quick.text));
       checks.push({ rel: rows.rel, has: ROW_HOOK });
+      checks.push({ rel: rows.rel, has: PICK_HOOK });
+      if (quick.text.includes('dfoItem:')) checks.push({ rel: rows.rel, has: 'dfoItem:' });
     }
 
     // ---- 3. the corpse body + sprite draws ------------------------------

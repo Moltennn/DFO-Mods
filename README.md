@@ -567,6 +567,13 @@ switch or the name list for stones. Filter changes apply the next time the
 plaque refreshes (look away and back); the reveal key is read as the plaque
 rebuilds.
 
+A filtered row is not just hidden from view: the selected row takes the **item
+it shows**. The game's quick-loot used the row index against the pile's
+unfiltered item list, so a visible row could take a hidden item; the filter now
+hands it the row's own item (and the selected take still shows the normal
+"take" line). **Take all** is the exception — it still takes everything in the
+pile, hidden rows included.
+
 A pile is hidden **as a whole**: if every item in it is filtered out and the
 pile was not actually empty, the plaque does not appear at all (no title with an
 empty list) and the **3-D pile of items on the ground is hidden too**. (The

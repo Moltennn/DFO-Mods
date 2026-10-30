@@ -184,6 +184,18 @@ export function keep(item) {
   return true;
 }
 
+/** The item behind the selected plaque row. The game's quick-loot took
+ *  `items[selectedRow]` from the unfiltered array; once rows are filtered that
+ *  index lands on a different, hidden item. Newer builds keep the selected
+ *  row's item on the quick-loot state as `dfoItem` (the installer adds it);
+ *  older builds hand the plaque state itself, whose rows carry `item`. */
+export function pick(state) {
+  if (!state) return null;
+  if (state.dfoItem) return state.dfoItem;
+  const row = state.rows?.[state.row];
+  return row && row.item ? row.item : null;
+}
+
 /* ------------------------------------------------------------ pile sprites */
 /* The dropped-loot manager (exposed as __dfoPiles by the installer) draws the
  * 3-D pile of items on the ground. A pile whose items are all filtered is put
@@ -297,7 +309,7 @@ function buildPane(container) {
 
   const note = document.createElement('div');
   note.style.cssText = 'color:var(--dim,#b9b2a1);font-size:12px;margin:2px 0 6px';
-  note.textContent = 'Hides rows from the loot list only; Take all still takes everything. Quest items are never hidden. Applies the next time the plaque refreshes (look away and back).';
+  note.textContent = 'Hides rows from the loot list only. The selected row takes the item you can see; Take all still takes everything. Quest items are never hidden. Applies the next time the plaque refreshes (look away and back).';
   container.appendChild(note);
 
   check('Enable loot filter', () => f.on, (v) => { f.on = v; save(); });
@@ -389,7 +401,7 @@ function buildPane(container) {
 /* -------------------------------------------------------------- lifecycle */
 export function install() {
   cfg ??= load();
-  globalThis.__dfoRowFilter = { keep, hideCorpse };
+  globalThis.__dfoRowFilter = { keep, hideCorpse, pick };
   bindReveal();
   syncPiles();
   pileTimer ??= setInterval(syncPiles, 700);

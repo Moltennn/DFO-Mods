@@ -259,11 +259,15 @@ const CSS = `
   background-color:color-mix(in srgb, var(--slate,#171b21) 90%, transparent)}
 #dfo-leveltracker .lt-list{display:grid;grid-template-columns:max-content 1fr max-content;column-gap:7px;
   row-gap:var(--lt-rowgap)}
+/* With Skill levels off there are two cells per row; drop the third column so
+ * the two-column flow cannot drift a cell into it. The explicit grid-columns
+ * below also keep uses/name anchored even if the template is out of step. */
+#dfo-leveltracker.lt-no-levels .lt-list{grid-template-columns:max-content 1fr}
 #dfo-leveltracker .lt-row{display:contents}
-#dfo-leveltracker .lt-row .uses{font-variant-numeric:tabular-nums;
+#dfo-leveltracker .lt-row .uses{grid-column:1;font-variant-numeric:tabular-nums;
   justify-self:end;color:var(--dim,#b9b2a1)}
-#dfo-leveltracker .lt-row .nm{white-space:nowrap}
-#dfo-leveltracker .lt-row .lvl{justify-self:end;color:var(--dim,#b9b2a1);
+#dfo-leveltracker .lt-row .nm{grid-column:2;white-space:nowrap}
+#dfo-leveltracker .lt-row .lvl{grid-column:3;justify-self:end;color:var(--dim,#b9b2a1);
   font-variant-numeric:tabular-nums;font-size:11px;white-space:nowrap}
 #dfo-leveltracker.lt-no-levels .lt-row .lvl{display:none}
 #dfo-leveltracker .lt-row.ready .uses{color:var(--brass-hi,#f3cf86);font-weight:600;text-shadow:0 0 7px rgba(243,207,134,.55)}

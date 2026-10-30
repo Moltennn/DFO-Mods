@@ -184,6 +184,11 @@ T2 · Chain Greaves · Legs
   Ring, Amulet, Bracer, Mark, …**), from the game's own template→slot table.
 - **Ammo** keeps its plain name; **gems** are coloured by stone (Ruby red …
   Pearl cream) and graded gems keep the grade word.
+- **Quest items** are the one row that is not a material: the row reads
+  `Quest: <name>` in magenta `#F873FF` (dot and name). In the item card only the game's
+  “Quest item” line below the name is magenta; the name and summary line stay
+  ordinary. The marker follows its own switch, so it still shows with tier
+  labels turned off.
 
 **Type / slot** in the pane picks how much is shown:
 
@@ -199,8 +204,9 @@ don't give it away keep the type (`Saber · Long Blade`, `Short Tunic · Chest`)
 The item card's summary line follows the same choice.
 
 **ESC → Mods → UI Tweaks**: **Tier labels**, **Type / slot** (Off / Hide obvious
-/ All), **Weapon hands (1H / 2H)**, **Colour by material**, **Colour scheme**
-(Classic / Bright), and **List rows** (3–20; the game's default is 6).
+/ All), **Weapon hands (1H / 2H)**, **Mark quest items** (magenta, `Quest: name`),
+**Colour by material**, **Colour scheme** (Classic / Bright), and **List rows**
+(3–20; the game's default is 6).
 
 Rows are coloured by material (a dot and the name) in the Classic Daggerfall
 palette or a brighter one; a magic/rare/legendary row keeps the game's rarity

@@ -115,6 +115,13 @@ const WEAPON_TYPES = {
 const STORE_KEY = 'dfoUiTweaks.config.v1';
 const STYLE_ID = 'dfo-uitweaks-style';
 
+/* Quest items: no material tier, and they must be easy to spot. They take their
+ * own colour key (the same --dfo-tier/--dfo-ink pair the tiers use) and a
+ * "Quest:" prefix on the plaque row. The item card already prints
+ * "Quest item: <quest>" as a boundline; the colour key reaches it too. */
+const QUEST_SLUG = 'quest';
+const QUEST_HEX = '#f873ff';
+
 /* The Daggerfall material order the game itself ranks by, low to high:
  * Leather, Chain, Iron, Steel, Silver, Elven, Dwarven, Mithril, Adamantium,
  * Ebony, Orcish, Daedric. The printed tier is the index + 1. */
@@ -201,12 +208,13 @@ function load() {
         colours: raw.colours !== false,
         typeMode,
         hands: raw.hands !== false,
+        quests: raw.quests !== false,
         scheme,
         rows: clampRows(raw.rows),
       };
     }
   } catch { /* unreadable - defaults */ }
-  return { labels: true, colours: true, typeMode: TYPE_MODE_DEFAULT, hands: true, scheme: 'classic', rows: ROWS_DEFAULT };
+  return { labels: true, colours: true, typeMode: TYPE_MODE_DEFAULT, hands: true, quests: true, scheme: 'classic', rows: ROWS_DEFAULT };
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch { /* private mode */ }
@@ -247,10 +255,17 @@ function armorClass(item) {
   const cls = m >> 8;
   return cls === 0 ? 'Leather' : cls === 1 ? 'Chain' : 'Plate';
 }
-/** The colour key for a row: a gem's own colour, or the material slug, or
- *  null when the item is not graded. */
+/** A quest item, when quest marking is on. The game sets `questItem` on the
+ *  item object (with a questUID); the value is truthy, not always `true`. */
+function isQuest(item) {
+  return !!(cfg?.quests !== false && item && typeof item === 'object' && item.questItem);
+}
+
+/** The colour key for a row: a quest item's own key, a gem's own colour, or the
+ *  material slug, or null when the item is not graded. */
 function materialSlug(item) {
   if (!item) return null;
+  if (isQuest(item)) return QUEST_SLUG;
   const gem = gemSlug(item);
   if (gem) return `gem-${gem}`;
   if (AMMO.test(String(item.name ?? ''))) return null;
@@ -360,8 +375,12 @@ function showSlot(name, slot) {
 /** The plaque row label. The installer calls this with the raw item and the
  *  game's own computed name (so quality words and epithets survive). */
 export function lootLabel(item, gameName = null) {
-  if (!cfg?.labels || !item || typeof item !== 'object') return null;
+  if (!item || typeof item !== 'object') return null;
   let name = String(gameName || item.name || 'Item').trim() || 'Item';
+  /* A quest item is marked whatever the tier-label switch says: the marker is
+   * the "Quests" switch on its own, so it never disappears by accident. */
+  if (isQuest(item)) return `Quest: ${name}`;
+  if (!cfg?.labels) return null;
   if (AMMO.test(String(item.name ?? ''))) return name; // no grade, no type
 
   const grade = materialOf(item);
@@ -390,6 +409,7 @@ export function lootLabel(item, gameName = null) {
 }
 
 export function lootTier(item) {
+  if (isQuest(item)) return QUEST_SLUG;
   if (!cfg?.labels) return null;
   return materialSlug(item);
 }
@@ -500,6 +520,15 @@ function tierCss() {
       rules.push(`.wplaque-row[data-tier="gem-${grade}-${stone}"], [data-dfo-tier="gem-${grade}-${stone}"] { --dfo-tier: ${hex}; --dfo-ink: ${hex}; }`);
     }
   }
+  /* Quest items: one magenta under every palette, on the plaque row and the card.
+   * The row keeps its dot (unlike gems), so a quest item reads at a glance. */
+  rules.push(`
+:root .wplaque-row[data-tier="${QUEST_SLUG}"], :root [data-dfo-tier="${QUEST_SLUG}"] { --dfo-tier: ${QUEST_HEX}; --dfo-ink: ${QUEST_HEX}; }
+:root .wplaque-row[data-tier="${QUEST_SLUG}"] > span:first-child { color: ${QUEST_HEX}; }
+:root .wplaque-row[data-tier="${QUEST_SLUG}"].sel > span:first-child { text-shadow: 0 0 8px ${QUEST_HEX}; }
+/* the card: only the game's own "Quest item" line (below the name) takes the
+ * colour; the name and the summary line stay as every other item's */
+:root body .card[data-dfo-tier="${QUEST_SLUG}"] .boundline { color: ${QUEST_HEX}; }`);
   return rules.join('\n');
 }
 function ensureStyle() {
@@ -605,6 +634,7 @@ function buildPane(container) {
   container.appendChild(typeLine);
 
   check('Weapon hands (1H / 2H)', () => cfg.hands, (v) => { cfg.hands = v; save(); });
+  check('Mark quest items (magenta, Quest: name)', () => cfg.quests, (v) => { cfg.quests = v; save(); });
   check('Colour by material', () => cfg.colours, (v) => { cfg.colours = v; save(); applyColours(); });
 
   const schemes = [
@@ -675,7 +705,7 @@ export function install() {
   cfg ??= load();
   ensureStyle();
   applyColours();
-  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, cardLine, tierOf: materialSlug };
+  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, cardLine, tierOf: materialSlug, isQuest };
   watchPlaque();
   liftTimer ??= setInterval(watchPlaque, 400);
 }

@@ -365,12 +365,21 @@ type:
   Chain or Plate.
 - Cosmetic/wearable items show the slot they go to: **Head, Chest, Legs, Feet,
   Gloves, Cloak, Ring, Amulet, Bracelet, Bracer, Mark, Crystal** — e.g.
-  `Short Tunic · Chest`, `Casual Pants · Legs`, `Ring of Skill · Ring`,
-  `Casual Cloak · Cloak`. Only a *worn* item carries an `equipSlot`; one on the
-  ground or in the pack does not, so the slot comes from the game's own
+  `Short Tunic · Chest`, `Casual Pants · Legs`, `The Vestments of Stendarr ·
+  Chest`, `Foxglove · Ring`. Only a *worn* item carries an `equipSlot`; one on
+  the ground or in the pack does not, so the slot comes from the game's own
   template→slot table (the paper doll's, 133–216) with `equipSlot` first when
-  present. The slot is the item's type, so it is always printed — it is not
-  dropped just because the name happens to contain the word.
+  present.
+- **Hide obvious types** (on by default) leaves the type off when the name
+  already says it, so the list carries only what it adds. The test is the type's
+  own vocabulary, matched on whole words: `Formal Cloak` → cloak, `Longsword`
+  → long blade, `Battle Axe` → axe, `Mace`/`Staff` → blunt, `Short Bow` →
+  archery, `Shoes` → feet, `Gown`/`Robe`/`Shirt` → chest, `Ring`/`Amulet`/
+  `Torc`/`Vambrace` → ring/amulet/bracer, `Leather Cuirass` → leather. Names
+  that don't give it away keep the type (`Short Tunic · Chest`,
+  `The Vestments of Stendarr · Chest`, `Foxglove · Ring`, `Wyrmbane · Long
+  Blade`). Untick it to print the type on every row — `Casual Cloak · Cloak`,
+  `Longsword of Skill · Long Blade`.
 - Ammo (pellets, arrows) carries no grade and no type — it keeps its plain
   name, because its material field is not a metal.
 - Gems carry no grade and no type either, but each is printed in its own
@@ -439,8 +448,9 @@ colour. Gems get no extra row — the name already says the grade — and
 everything else shows a plain `Kind` (Ingredient / Book / Clothing / Misc).
 
 **ESC → Mods → UI Tweaks** has **Tier labels** (off restores the game's plain
-names), **Colour by material**, the **Colour scheme** (Classic / Bright) and
-**List rows**. Settings live in `localStorage['dfoUiTweaks.config.v1']`.
+names), **Hide obvious types**, **Colour by material**, the **Colour scheme**
+(Classic / Bright) and **List rows**. Settings live in
+`localStorage['dfoUiTweaks.config.v1']`.
 
 ### What it patches
 

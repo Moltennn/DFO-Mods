@@ -73,6 +73,34 @@ const WEAPON_BY_INDEX = {
   129: 'Archery', 130: 'Archery', 131: 'Archery',
 };
 
+/* Name words that already give the type away, keyed by the type they stand for.
+ * "Hide obvious types" leaves the type off only for these: a Formal Cloak is
+ * plainly a cloak, a Longsword a long blade, a Battle Axe an axe. Words are
+ * matched on whole tokens of the normalized name, so "market" is not a mark
+ * and "elbow" is not a bow. A type with no words listed here always prints. */
+const OBVIOUS_WORDS = {
+  'Short Blade': ['dagger', 'dirk', 'tanto', 'wakazashi', 'shortsword', 'short sword', 'knife', 'stiletto'],
+  'Long Blade': ['longsword', 'long sword', 'broadsword', 'broad sword', 'saber', 'sabre', 'katana', 'claymore', 'dai katana', 'scimitar'],
+  Axe: ['axe', 'hatchet'],
+  'Blunt Weapon': ['mace', 'flail', 'warhammer', 'war hammer', 'hammer', 'staff', 'club', 'cudgel'],
+  Archery: ['bow', 'shortbow', 'longbow', 'short bow', 'long bow', 'arrow', 'crossbow'],
+  Leather: ['leather'],
+  Chain: ['chain', 'chainmail', 'mail'],
+  Plate: ['plate'],
+  Head: ['helm', 'helmet', 'hat', 'hood', 'cap', 'coif'],
+  Chest: ['shirt', 'robe', 'gown', 'vest', 'blouse', 'jerkin', 'doublet'],
+  Legs: ['pants', 'trousers', 'breeches', 'leggings', 'greaves', 'skirt'],
+  Feet: ['shoe', 'boot', 'sandal', 'slipper'],
+  Gloves: ['glove', 'gauntlet'],
+  Cloak: ['cloak', 'mantle', 'cape', 'cowl', 'shawl'],
+  Ring: ['ring'],
+  Amulet: ['amulet', 'necklace', 'torc', 'pendant'],
+  Bracelet: ['bracelet'],
+  Bracer: ['bracer', 'vambrace'],
+  Mark: ['mark'],
+  Crystal: ['crystal'],
+};
+
 /* Weapon name -> skill, for items whose template index is not in the table
  * (added content). Names are content, not minifier output. */
 const WEAPON_TYPES = {
@@ -160,12 +188,13 @@ function load() {
       return {
         labels: raw.labels !== false,
         colours: raw.colours !== false,
+        hideObvious: raw.hideObvious !== false,
         scheme,
         rows: clampRows(raw.rows),
       };
     }
   } catch { /* unreadable - defaults */ }
-  return { labels: true, colours: true, scheme: 'classic', rows: ROWS_DEFAULT };
+  return { labels: true, colours: true, hideObvious: true, scheme: 'classic', rows: ROWS_DEFAULT };
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch { /* private mode */ }
@@ -246,6 +275,18 @@ function typeOf(item) {
   return WEAPON_TYPES[norm(item.name)] ?? null;
 }
 
+/** True when the name already says the type: "Longsword" is a long blade, a
+ *  "Formal Cloak" a cloak, a "Battle Axe" an axe. Whole tokens only, with a
+ *  simple plural ("Plain Robes", "Shoes"). */
+function obviousType(name, type) {
+  const words = OBVIOUS_WORDS[type];
+  if (!words) return false;
+  const padded = ` ${norm(name)} `;
+  const has = (w) => padded.includes(` ${w} `) || padded.includes(` ${w}s `)
+    || (w.endsWith('s') && padded.includes(` ${w.slice(0, -1)} `));
+  return words.some(has);
+}
+
 /** The plaque row label. The installer calls this with the raw item and the
  *  game's own computed name (so quality words and epithets survive). */
 export function lootLabel(item, gameName = null) {
@@ -267,12 +308,10 @@ export function lootLabel(item, gameName = null) {
   parts.push(name);
 
   const type = typeOf(item);
-  /* A material class or weapon skill is skipped when the name already says it
-   * (Leather Cuirass, Elm Long Bow). A cosmetic's slot is the point of the
-   * type, so it is always printed - "Ring of Skill · Ring", "Casual Cloak ·
-   * Cloak", "The Mark of the Hist · Mark". */
-  const wearable = item.group !== 'Armor' && item.group !== 'Weapons';
-  if (type && (wearable || !norm(name).includes(norm(type)))) parts.push(type);
+  /* "Hide obvious types" drops the type when the name already says it
+   * (Formal Cloak ... cloak, Longsword ... long blade, Battle Axe ... axe);
+   * with the switch off every item prints its type. */
+  if (type && !(cfg.hideObvious && obviousType(name, type))) parts.push(type);
   return parts.join(' \u00b7 ');
 }
 
@@ -461,9 +500,10 @@ function buildPane(container) {
 
   const note = document.createElement('div');
   note.style.cssText = 'color:var(--dim,#b9b2a1);font-size:12px;margin:6px 0 2px';
-  note.textContent = 'Loot piles (and any other world plaque) print a tier by material, with the weapon skill or armor class after the name. The list length applies the next time the plaque refreshes (look away and back).';
+  note.textContent = 'Loot piles (and any other world plaque) print a tier by material, with the weapon skill, armor class or clothing slot after the name. Hide obvious types leaves that last word off when the name already says it (Formal Cloak, Longsword, Battle Axe); untick it to print the type on every row. The list length applies the next time the plaque refreshes (look away and back).';
   container.appendChild(note);
   check('Tier labels', () => cfg.labels, (v) => { cfg.labels = v; save(); });
+  check('Hide obvious types (Cloak, Longsword, Axe)', () => cfg.hideObvious, (v) => { cfg.hideObvious = v; save(); });
   check('Colour by material', () => cfg.colours, (v) => { cfg.colours = v; save(); applyColours(); });
 
   const schemes = [

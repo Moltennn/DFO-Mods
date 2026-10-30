@@ -4,6 +4,8 @@
 *
 !.gitignore
 !README.md
+!install.sh
+!install.bat
 !modloader/
 !modloader/**
 !skillhud-mod/
@@ -13,5 +15,7 @@
 !lootfilter-mod/
 !lootfilter-mod/**
 
-# generated on each machine by the installers (never commit it)
+# generated on each machine by the installers (never commit them)
 modloader/mods.json
+modloader/app-path.txt
+modloader/win-sync.vbs

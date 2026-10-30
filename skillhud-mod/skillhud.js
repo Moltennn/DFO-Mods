@@ -64,6 +64,7 @@ function normalize(c) {
   if (!c.tracked.length) return null;
   const op = c.opacity; c.opacity = typeof op === 'number' && op >= .05 && op <= 1 ? op : .92;
   c.hidden = c.hidden === true;
+  c.showLevel = c.showLevel !== false;
   c.rowGap = Math.min(ROW_GAP_MAX, Math.max(ROW_GAP_MIN, Math.round(c.rowGap ?? ROW_GAP_DEFAULT)));
   delete c.hideKey; // the keybind is gone; drop it from older configs
   return c;
@@ -76,7 +77,7 @@ function builtDefaults(e) {
     });
   });
   if (!picked.length) [34, 21, 17, 16, 30, 20].forEach((i) => { if (picked.indexOf(i) < 0) picked.push(i); });
-  return { tracked: picked, opacity: .92, hidden: false, rowGap: ROW_GAP_DEFAULT };
+  return { tracked: picked, opacity: .92, hidden: false, showLevel: true, rowGap: ROW_GAP_DEFAULT };
 }
 function primaryOf(e) { return e && e.career && e.career.primarySkills; }
 function majorOf(e) { return e && e.career && e.career.majorSkills; }
@@ -201,6 +202,17 @@ function entity() {
   return window.__playerEntity && window.__playerEntity.chargenDone ? window.__playerEntity : null;
 }
 
+/** The level line: the real level, and - while the game is mentoring you down
+ *  to a party member - the level you actually fight at. The game itself shows
+ *  only the fought-as level on the character sheet; this keeps the real one
+ *  first: "104 (87)" = real 104, fighting as 87. */
+function levelLabel(e) {
+  const real = Number(e?._mentor?.realLevel ?? e?.level);
+  if (!Number.isFinite(real)) return '';
+  const fought = Number(e?._mentor?.level);
+  return Number.isFinite(fought) && fought !== real ? `${real} (${fought})` : String(real);
+}
+
 /** Diagnostics for DevTools - the numbers behind one row:
  *  __dfoMods.active.get('../dfo-skillhud.js').module.debugSkill(34) */
 export function debugSkill(t) {
@@ -210,7 +222,7 @@ export function debugSkill(t) {
 }
 
 // ------------------------------------------------------------------ HUD
-let el = null, listEl = null, styleEl = null, timer = null;
+let el = null, listEl = null, headEl = null, lvEl = null, styleEl = null, timer = null;
 let renderer = null; // per-instance row renderer (rebuilt in buildHud)
 
 /* The game's own piece boxes (.hud .hud-temp etc.), verbatim as observed:
@@ -236,6 +248,12 @@ const CSS = `
   background-color:color-mix(in srgb, var(--slate,#171b21) 90%, transparent)}
 #dfo-leveltracker .lt-list{display:grid;grid-template-columns:max-content 1fr;column-gap:7px;
   row-gap:var(--lt-rowgap)}
+/* the level line, right-aligned over the rows (real level, then the level the
+ * game fights you at while mentoring: "104 (87)") */
+#dfo-leveltracker .lt-head{display:flex;justify-content:flex-end;align-items:baseline;
+  margin:0 0 2px;color:var(--brass,#c08a3e);font-variant-numeric:tabular-nums;
+  letter-spacing:.04em;font-size:12px}
+#dfo-leveltracker .lt-head .lv{font-weight:600}
 #dfo-leveltracker .lt-row{display:contents}
 #dfo-leveltracker .lt-row .uses{font-variant-numeric:tabular-nums;
   justify-self:end;color:var(--dim,#b9b2a1)}
@@ -323,7 +341,14 @@ function buildHud() {
   el.id = 'dfo-leveltracker';
   el.classList.add('dfo-lt');
   // no title line: the panel is a piece of the game's HUD (the Alt+U editor
-  // names it "Skill tracker"), and its rows are self-explanatory
+  // names it "Skill tracker"), and its rows are self-explanatory. The level
+  // line on the right is optional (Show level in the Mods pane).
+  headEl = document.createElement('div');
+  headEl.className = 'lt-head';
+  lvEl = document.createElement('span');
+  lvEl.className = 'lv';
+  headEl.appendChild(lvEl);
+  el.appendChild(headEl);
   listEl = document.createElement('div');
   listEl.className = 'lt-list';
   el.appendChild(listEl);
@@ -476,6 +501,13 @@ function render() {
   place();
   if (rowGapCache !== cfg.rowGap) { rowGapCache = cfg.rowGap; el.style.setProperty('--lt-rowgap', cfg.rowGap + 'px'); }
   const e = entity();
+  if (headEl) {
+    const show = cfg.showLevel !== false;
+    const head = show ? 'flex' : 'none';
+    if (headEl.style.display !== head) headEl.style.display = head;
+    const text = show ? levelLabel(e) : '';
+    if (lvEl && lvEl.textContent !== text) lvEl.textContent = text;
+  }
   renderer(listEl, e, e ? cfg.tracked.slice().sort((a, b) => a - b) : []);
 }
 
@@ -516,6 +548,12 @@ export function mountPane(container) {
   };
   opWrap.append(op, opLabel);
   row('Panel opacity', opWrap);
+
+  // the level line on the right of the panel ("104 (87)" while mentoring)
+  const lv = document.createElement('input'); lv.type = 'checkbox';
+  lv.checked = cfg.showLevel !== false;
+  lv.onchange = () => { cfg.showLevel = lv.checked; save(); render(); };
+  row('Show level', lv);
 
   // px between rows: 0 = fully packed, 10 = airy
   const gap = document.createElement('input'); gap.type = 'range'; gap.min = String(ROW_GAP_MIN); gap.max = String(ROW_GAP_MAX);

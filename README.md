@@ -21,6 +21,8 @@ The repository contains four pieces:
 
 ```
 README.md                 this file
+install.sh                one-step install/repair for Linux and macOS
+install.bat               one-step install/repair for Windows
 modloader/
   boot.js                 served as assets/dfo-mods/boot.js
   install.mjs             install/check/uninstall the loader; --install-watch
@@ -31,7 +33,7 @@ modloader/
     marker.mjs            Game/.dfo-mods/installed.json (loader + mods)
     registry.mjs          served registry.js + workspace manifest
     loader.mjs            ensure/check/remove the loader
-    autosync.mjs          systemd (Linux) / launchd (macOS) units
+    autosync.mjs          systemd (Linux) / launchd (macOS) / schtasks (Windows)
 skillhud-mod/
   skillhud.js             the mod (HUD + ESC pane)
   install.mjs             its patches + registration
@@ -58,6 +60,36 @@ there is no local build to patch and no version store to overlay. These tools
 edit files on the machine that runs the desktop build.
 
 ## Install
+
+### One step (the whole thing)
+
+Linux and macOS:
+
+```bash
+./install.sh
+```
+
+Windows (double-click or from a command prompt):
+
+```bat
+install.bat
+```
+
+Either script installs the loader, every mod in the workspace, and the
+autosync scheduler, then prints the health check. It is idempotent — run it
+again any time (including after a game update) to repair the install.
+
+On a portable/unpacked build, pass the game once so the headless scheduler can
+find it later:
+
+```bash
+./install.sh --app="/path/to/DFO Online"
+install.bat "C:\path\to\DFO Online"
+```
+
+The path is remembered in `modloader/app-path.txt` (local only; autosync reads
+it back). `node modloader/sync.mjs` alone also works and discovers
+`../*-mod/install.mjs` when `modloader/mods.json` has not been generated yet.
 
 ### Skill Tracker (installs the loader too)
 
@@ -157,9 +189,11 @@ Everything is in the game's **ESC (pause) menu → Mods** (Enhanced skin):
 - **Reload all** sits on the right of the footer bar (the footer carries the
   credit and the repo link on the left).
 - Each mod's band holds its settings. For **Skill Tracker**: panel opacity
-  (with its percentage), row spacing, **Show/Hide panel**, reset placement, and
-  the tracked-skill checklist (three columns when the pane is wide enough, two
-  when it is not).
+  (with its percentage), **Show level** (the character's level on the right;
+  while the game is mentoring you down to a party member it reads
+  `104 (87)` — real level, then the level you fight at), row spacing,
+  **Show/Hide panel**, reset placement, and the tracked-skill checklist (three
+  columns when the pane is wide enough, two when it is not).
 
 A reload re-reads the registry: a mod whose `MOD_BUILD` changed is unmounted
 and replaced; a mod removed from the registry is unloaded; an unchanged import
@@ -184,11 +218,14 @@ It runs `node modloader/sync.mjs` when `Game/state.json` or the launcher's
   (`journalctl --user -u dfo-mod-sync`).
 - **macOS** — LaunchAgent `dev.dfo.modloader`
   (`~/Library/Logs/dfo-modloader.log`).
-- **Windows** — no file watcher; run `node modloader/sync.mjs` after an update.
+- **Windows** — Scheduled Task `DFO Mods Sync`, every 5 minutes (no file
+  watcher needed; self-healing after a logout).
 
 `sync.mjs` runs the loader installer, then every mod listed in the generated
-`modloader/mods.json`, each with `--if-needed`. Exit 2 ("nothing patchable
-right now") is not a failure.
+`modloader/mods.json`, each with `--if-needed`. When that manifest does not
+exist yet (a fresh checkout), it discovers `../*-mod/install.mjs` and runs
+those once so they register; exit 2 ("nothing patchable right now") is not a
+failure.
 
 `node modloader/install.mjs --remove-watch` removes the scheduler.
 `node skillhud-mod/install.mjs --install-watch` does the same from the mod's
@@ -281,7 +318,9 @@ dims: 100 for an unmastered skill, 200 under **Master Skills**. It reads the
 same character data the game's own skill screens show.
 
 The panel carries no title line — it is a piece of the HUD, and the Alt+U
-editor names it "Skill tracker".
+editor names it "Skill tracker". An optional **Show level** line sits on the
+right above the rows: your level, and while the game is mentoring you down to a
+party member, the level you actually fight at — `104 (87)`.
 
 The panel uses the game's own `:root` design tokens (`--bone`, `--dim`,
 `--brass`, `--brass-hi`, `--dfo-text-font`) with classic-skin fallbacks, so it
@@ -371,14 +410,15 @@ type:
   template→slot table (the paper doll's, 133–216) with `equipSlot` first when
   present.
 - **Hide obvious types** (on by default) leaves the type off when the name
-  already says it, so the list carries only what it adds. The test is the type's
-  own vocabulary, matched on whole words: `Formal Cloak` → cloak, `Longsword`
-  → long blade, `Battle Axe` → axe, `Mace`/`Staff` → blunt, `Short Bow` →
-  archery, `Shoes` → feet, `Gown`/`Robe`/`Shirt` → chest, `Ring`/`Amulet`/
-  `Torc`/`Vambrace` → ring/amulet/bracer, `Leather Cuirass` → leather. Names
-  that don't give it away keep the type (`Short Tunic · Chest`,
+  already says it in plain language, so the list carries only what it adds.
+  The test is the type's own vocabulary, matched on whole words: `Formal
+  Cloak` → cloak, `Longsword` → long blade, `Battle Axe` → axe, `Mace`/`Staff`
+  → blunt, `Short Bow` → archery, `Shoes` → feet, `Gown`/`Robe`/`Shirt` →
+  chest, `Ring`/`Amulet` → ring/amulet, `Leather Cuirass` → leather. Names that
+  don't give it away keep the type: `Saber · Long Blade`, `Katana · Long
+  Blade`, `Broadsword · Long Blade`, `Short Tunic · Chest`,
   `The Vestments of Stendarr · Chest`, `Foxglove · Ring`, `Wyrmbane · Long
-  Blade`). Untick it to print the type on every row — `Casual Cloak · Cloak`,
+  Blade`. Untick it to print the type on every row — `Casual Cloak · Cloak`,
   `Longsword of Skill · Long Blade`.
 - Ammo (pellets, arrows) carries no grade and no type — it keeps its plain
   name, because its material field is not a metal.

@@ -164,8 +164,18 @@ async function respond(req, res, get) {
   return send(res, 200, mimeOf(rel), body);
 }
 
-/** Start the server on 127.0.0.1 (an OS-chosen port). `app` names the launcher, for the bundled build. */
-export function startServer({ app = null, log = () => {} } = {}) {
+/**
+ * The port the game is served on. It is FIXED on purpose: the page's origin
+ * (host and port) is where the browser keeps localStorage - the mods' settings -
+ * and the game's in-page data-folder pick. A new port every launch would look
+ * like a new site and lose both. DFO_MODS_PORT overrides it; if it is taken the
+ * server falls back to a free port for that launch only (settings do not carry
+ * across that launch).
+ */
+export const DEFAULT_PORT = 47831;
+
+/** Start the server on 127.0.0.1. `app` names the launcher, for the bundled build. */
+export function startServer({ app = null, log = () => {}, port = Number(process.env.DFO_MODS_PORT) || DEFAULT_PORT } = {}) {
   const get = buildCache({ app, log });
   const server = http.createServer((req, res) => {
     respond(req, res, get).catch((e) => {
@@ -174,12 +184,18 @@ export function startServer({ app = null, log = () => {} } = {}) {
     });
   });
   return new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => resolve({
+    server.once('error', (e) => {
+      if (e.code !== 'EADDRINUSE' || !port) { reject(e); return; }
+      log(`port ${port} is taken by another program - using a free port for this launch (mod settings will not carry over)`);
+      server.listen(0, '127.0.0.1', () => resolve(done()));
+    });
+    server.once('listening', () => resolve(done()));
+    server.listen(port, '127.0.0.1');
+    const done = () => ({
       url: `http://127.0.0.1:${server.address().port}/${GAME_ENTRY}`,
       close: () => server.close(),
       get,
-    }));
+    });
   });
 }
 

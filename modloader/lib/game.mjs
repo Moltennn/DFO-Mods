@@ -253,23 +253,29 @@ export function runningAppAsars(tmpdirs = [...new Set([process.env.TMPDIR, os.tm
   const out = new Set();
 
   if (process.platform === 'linux') {
-    const mounts = new Set();
-    for (const tmp of tmpdirs) {
-      try {
-        for (const n of fs.readdirSync(tmp)) if (n.startsWith('.mount_')) mounts.add(path.join(tmp, n));
-      } catch { /* not there */ }
-    }
-    // AppImage mounts under a TMPDIR this process does not share
+    // A mount a LIVE process is running from. A .mount_* folder left in TMPDIR by
+    // a crash or a kill is not a running game - its app.asar may still be there.
+    let live = null;
     try {
+      live = new Set();
       for (const pid of fs.readdirSync('/proc')) {
         if (!/^\d+$/.test(pid)) continue;
         try {
           const exe = fs.readlinkSync(`/proc/${pid}/exe`);
           const m = /^(\S+\/\.mount_[^/]+)\//.exec(exe);
-          if (m) mounts.add(m[1]);
+          if (m) live.add(m[1]);
         } catch { /* another user's process, gone */ }
       }
-    } catch { /* no procfs */ }
+    } catch { live = null; /* no procfs */ }
+    const mounts = new Set(live ?? []);
+    // Without procfs, a mount in TMPDIR is the best guess there is.
+    if (!live) {
+      for (const tmp of tmpdirs) {
+        try {
+          for (const n of fs.readdirSync(tmp)) if (n.startsWith('.mount_')) mounts.add(path.join(tmp, n));
+        } catch { /* not there */ }
+      }
+    }
     for (const m of mounts) {
       const file = path.join(m, 'resources', 'app.asar');
       if (fs.existsSync(file)) out.add(file);

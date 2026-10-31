@@ -97,8 +97,14 @@ if (!app) {
 }
 try { fs.writeFileSync(GAME_FILE, `${app}\n`); } catch { /* read-only workspace */ }
 
+// A game started a moment ago (the shortcut was pressed twice, or it is still
+// loading) is not a reason to refuse: wait for it to settle, then check again.
+for (let i = 0; i < 20 && runningAppAsars().length > 0; i++) {
+  if (i === 0) say('the game is already running - waiting for it to close');
+  await sleep(1000);
+}
 if (runningAppAsars().length > 0) {
-  console.error('[dfo-mods] the game is already running. Close it, then start again - it must start through this launcher to get the mods.');
+  console.error('[dfo-mods] the game is still running. Close it, then start again - it must start through this launcher to get the mods.');
   process.exit(1);
 }
 

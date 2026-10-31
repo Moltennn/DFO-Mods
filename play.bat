@@ -1,13 +1,13 @@
 @echo off
 rem DFO Online (Mods) - sync the mods, then open the game's launcher.
 rem No background service; this only runs while the shortcut is starting.
+rem Node.js 18+: the system copy, or a portable one in node\node.exe (or DFO_NODE).
 setlocal
 cd /d "%~dp0"
-where node >nul 2>nul
+call "modloader\find-node.bat" "%~dp0"
 if errorlevel 1 (
-  echo Node.js 18 or newer is required: https://nodejs.org
   pause
   exit /b 1
 )
-node "modloader\play.mjs" %*
+"%NODE%" "modloader\play.mjs" %*
 if errorlevel 1 pause

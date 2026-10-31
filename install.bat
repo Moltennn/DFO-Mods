@@ -8,8 +8,9 @@ rem                               (no background service)
 rem   install.bat "C:\path\to\DFO Online.exe"   same, for a portable/unpacked
 rem                               build (or a custom install folder)
 rem
-rem Node.js 18 or newer is required. Everything is idempotent - running it
-rem again after a game update repairs the install.
+rem Node.js 18 or newer is required: the system copy, or a portable one in
+rem node\node.exe (or DFO_NODE set to its path). Everything is idempotent -
+rem running it again after a game update repairs the install.
 setlocal
 cd /d "%~dp0"
 
@@ -19,20 +20,19 @@ if not "%~1"=="" (
   set "DFO_APP=%~1"
 )
 
-where node >nul 2>nul
+call "modloader\find-node.bat" "%~dp0"
 if errorlevel 1 (
-  echo Node.js 18 or newer is required: https://nodejs.org
   pause
   exit /b 1
 )
 
-echo [dfo-mods] installing the loader and every mod
-node "modloader\sync.mjs"
+echo [dfo-mods] installing the loader and every mod (node: %NODE%)
+"%NODE%" "modloader\sync.mjs"
 if errorlevel 1 goto fail
 
 echo.
 echo [dfo-mods] removing any background watcher ^(the shortcut replaces it^)
-node "modloader\install.mjs" --remove-watch
+"%NODE%" "modloader\install.mjs" --remove-watch
 
 echo.
 echo [dfo-mods] setting up the "DFO Online (Mods)" desktop shortcut
@@ -42,10 +42,10 @@ echo shortcut: %USERPROFILE%\Desktop\DFO Online (Mods).lnk
 
 echo.
 echo [dfo-mods] checking
-node "modloader\install.mjs" --check
+"%NODE%" "modloader\install.mjs" --check
 if errorlevel 1 goto fail
 for /d %%D in (*-mod) do (
-  if exist "%%D\install.mjs" node "%%D\install.mjs" --check
+  if exist "%%D\install.mjs" "%NODE%" "%%D\install.mjs" --check
 )
 
 echo.

@@ -20,7 +20,10 @@ from loot piles). The loader (`modloader/`) installs and serves them, and
 - The **desktop build** of DFO Online: Linux AppImage, Windows `.exe`, or
   macOS `.app`.
 - [Node.js](https://nodejs.org/) 18 or newer — only for the installers and the
-  launcher.
+  launcher. No system install? Put a portable copy at `node/bin/node`
+  (Linux/macOS) or `node\node.exe` (Windows) inside this folder, or set
+  `DFO_NODE` to its path. The scripts look in that order: `DFO_NODE`, the
+  portable copy, then `node` on PATH.
 - A copy of this repository next to the game.
 
 **Browser play is not supported.** The browser build is served by the website;

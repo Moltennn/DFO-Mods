@@ -29,7 +29,7 @@ const RARITY_NAMES = ['Common', 'Magic', 'Rare', 'Legendary', 'Artifact'];
 
 /* Ammo and the Daggerfall material order (Leather 1, Chain 2, Iron 3 ...
  * Daedric 12) — the same scale the tier labels use. */
-const AMMO = /(?:^|\s)(pellets?|arrows?|bolts?)$/i;
+const AMMO = /(?:^|\s)(pellets?|arrows?|bolts?|bullets?|darts?|sling stones?)$/i;
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.trunc(Number(n) || 0)));
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -234,7 +234,10 @@ function tierOf(item) {
   const m = Number(item.material);
   if (!Number.isInteger(m) || m < 0) return null;
   const group = String(item.group ?? '');
-  if (group === 'Weapons') return m < 10 ? m + 3 : null;
+  if (group === 'Weapons') {
+    if (AMMO.test(String(item.name ?? ''))) return null; // ammo is not graded
+    return m < 10 ? m + 3 : null;
+  }
   if (group === 'Armor') {
     const cls = m >> 8;
     if (cls === 0) return 1; // Leather

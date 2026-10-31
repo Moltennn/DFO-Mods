@@ -251,7 +251,7 @@ function save() {
 }
 
 /* Ammo is not material-graded: pellets and arrows keep their plain name. */
-const AMMO = /(?:^|\s)(pellets?|arrows?|bolts?)$/i;
+const AMMO = /(?:^|\s)(pellets?|arrows?|bolts?|bullets?|darts?|sling stones?)$/i;
 
 /** How many item rows the plaque shows at once (the game hard-caps at 6;
  *  the installer makes its row framer ask this instead). */

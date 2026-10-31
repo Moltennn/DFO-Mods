@@ -120,6 +120,17 @@ const STYLE_ID = 'dfo-uitweaks-style';
  * "Quest:" prefix on the plaque row. The item card already prints
  * "Quest item: <quest>" as a boundline; the colour key reaches it too. */
 const QUEST_SLUG = 'quest';
+
+/* Ingredient glyphs, drawn as masks so they take the row's own colour. */
+const ICON_SVG = {
+  herb: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 22V10c0-4 3-7 9-7 0 6-3 9-9 9zm0-6v-3c0-3-3-6-8-6 0 5 3 9 8 9z'/></svg>",
+  fungus: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M3 12a9 9 0 0 1 18 0zm7 1h4v6a2 2 0 0 1-4 0z'/></svg>",
+  mineral: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 1l8 8-8 14L4 9z'/></svg>",
+  flower: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2a3.5 3.5 0 0 1 0 7 3.5 3.5 0 0 1 0-7zm-5 5a3.5 3.5 0 0 1 5 5 3.5 3.5 0 0 1-5-5zm10 0a3.5 3.5 0 0 1 0 7 3.5 3.5 0 0 1 0-7zm-5 5a3.5 3.5 0 0 1 0 7 3.5 3.5 0 0 1 0-7zM11 15h2v8h-2z'/></svg>",
+  animal: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm12 0a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM3 16c0-3.5 4-6 9-6s9 2.5 9 6-4 6-9 6-9-2.5-9-6z'/></svg>",
+};
+const ICON_RULES = Object.entries(ICON_SVG).map(([kind, svg]) =>
+  `:root.dfo-uitweaks-icons .pack-shell .itemrow[data-dfo-ing="${kind}"] .itemname > span::before{--dfo-icon:url("data:image/svg+xml,${encodeURIComponent(svg)}")}`).join('\n');
 const QUEST_HEX = '#f873ff';
 
 /* The Daggerfall material order the game itself ranks by, low to high:
@@ -139,6 +150,23 @@ const PALETTES = {
     ebony: { hex: '#1a1a1a', ink: '#909090' }, orcish: { hex: '#2e8b57' },
     daedric: { hex: '#b22222', ink: '#d95757' },
   },
+  /* Blue/orange ramp: readable for red-green colour blindness, where the
+   * metal ladder (red->green->gold) collapses into one muddy band. */
+  colourblind: {
+    leather: { hex: '#8a6a3a' }, chain: { hex: '#9aa0a6' },
+    iron: { hex: '#c8c8c8' }, steel: { hex: '#e2e2e2' }, silver: { hex: '#f2f6fa' },
+    elven: { hex: '#66b3ff' }, dwarven: { hex: '#f5c542' }, mithril: { hex: '#2f7dff' },
+    adamantium: { hex: '#b4b4b4' }, ebony: { hex: '#6f6f6f' }, orcish: { hex: '#a3c94a' },
+    daedric: { hex: '#ff7a3d' },
+  },
+  /* Maximum separation on a dark ground, for low vision. */
+  contrast: {
+    leather: { hex: '#ffd24d' }, chain: { hex: '#ffffff' },
+    iron: { hex: '#ffffff' }, steel: { hex: '#ffffff' }, silver: { hex: '#ffffff' },
+    elven: { hex: '#66ffcc' }, dwarven: { hex: '#ffd24d' }, mithril: { hex: '#66ccff' },
+    adamantium: { hex: '#ff9ec4' }, ebony: { hex: '#b8b8ff' }, orcish: { hex: '#9dff5a' },
+    daedric: { hex: '#ff5c5c' },
+  },
   bright: {
     leather: { hex: '#b08355' }, chain: { hex: '#aeb4bd' },
     iron: { hex: '#b8b2a4' }, steel: { hex: '#cdd5df' }, silver: { hex: '#eaf0f6' },
@@ -147,7 +175,7 @@ const PALETTES = {
     daedric: { hex: '#ff6050' },
   },
 };
-const SCHEMES = ['classic', 'bright'];
+const SCHEMES = ['classic', 'bright', 'colourblind', 'contrast'];
 
 /* Gems are their own thing: no metal grade, no type, no dot - the row is just
  * the gem in its own colour, and the grade word the game already puts in the
@@ -209,12 +237,14 @@ function load() {
         typeMode,
         hands: raw.hands !== false,
         quests: raw.quests !== false,
+        gradient: raw.gradient !== false,
+        icons: raw.icons !== false,
         scheme,
         rows: clampRows(raw.rows),
       };
     }
   } catch { /* unreadable - defaults */ }
-  return { labels: true, colours: true, typeMode: TYPE_MODE_DEFAULT, hands: true, quests: true, scheme: 'classic', rows: ROWS_DEFAULT };
+  return { labels: true, colours: true, typeMode: TYPE_MODE_DEFAULT, hands: true, quests: true, gradient: true, icons: true, scheme: 'classic', rows: ROWS_DEFAULT };
 }
 function save() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(cfg)); } catch { /* private mode */ }
@@ -408,6 +438,59 @@ export function lootLabel(item, gameName = null) {
   return parts.join(' \u00b7 ');
 }
 
+/** The name a loot-window / pack row shows: quest items say so, as on the plaque. */
+export function rowName(item, gameName = null) {
+  if (!item) return gameName;
+  const name = String(gameName || item.name || '');
+  return isQuest(item) ? `Quest: ${name}` : name;
+}
+
+/* Ingredient icons: a small glyph by kind, keyed from the name. Only the
+ * ingredient group gets one - an icon on every row would be noise. */
+const ICON_KINDS = [
+  ['fungus', ['mushroom', 'toadstool', 'fungus', 'spore', 'mold', 'mould', 'lichen', 'truffle']],
+  ['mineral', ['salt', 'crystal', 'ore', 'stone', 'dust', 'powder', 'resin', 'amber']],
+  ['flower', ['flower', 'blossom', 'petal', 'rose', 'lily', 'orchid']],
+  ['animal', ['gland', 'venom', 'eye', 'bone', 'blood', 'scale', 'heart', 'tongue', 'claw', 'fang', 'horn', 'silk']],
+  ['herb', ['leaf', 'root', 'herb', 'weed', 'grass', 'stem', 'bark', 'moss', 'fern', 'bulb']],
+];
+function ingredientKind(item) {
+  if (!item || !/Ingredient/i.test(String(item.group ?? ''))) return null;
+  const words = norm(item.name);
+  for (const [kind, keys] of ICON_KINDS) {
+    if (keys.some((k) => new RegExp(`(^| )${k}(s)?( |$)`).test(words))) return kind;
+  }
+  return 'herb';
+}
+
+/** Mark a pack / loot-window row with its colour keys (the CSS reads them). */
+export function decorateRow(el, item) {
+  if (!el || !el.dataset) return;
+  const tags = tierTags(item);
+  if (tags[0]) el.dataset.dfoTier = tags[0];
+  if (tags[1]) el.dataset.dfoT2 = tags[1];
+  else delete el.dataset.dfoT2;
+  if (cfg?.icons !== false) {
+    const kind = ingredientKind(item);
+    if (kind) el.dataset.dfoIng = kind;
+  }
+}
+
+/** The colour keys for a row, strongest first (at most two), so a name can
+ *  fade between them (quest + gem, quest + metal, gem + ...). */
+export function tierTags(item) {
+  if (!item || typeof item !== 'object') return [];
+  const tags = [];
+  if (isQuest(item)) tags.push(QUEST_SLUG);
+  const gem = gemSlug(item);
+  if (gem) tags.push(`gem-${gem}`);
+  if (!tags.length) {
+    const mat = materialSlug(item);
+    if (mat) tags.push(mat);
+  }
+  return tags.slice(0, 2);
+}
+
 export function lootTier(item) {
   if (isQuest(item)) return QUEST_SLUG;
   if (!cfg?.labels) return null;
@@ -508,18 +591,39 @@ function tierCss() {
   for (const scheme of SCHEMES) {
     for (const [slug, c] of Object.entries(PALETTES[scheme])) {
       rules.push(`.dfo-uitweaks-scheme-${scheme} .wplaque-row[data-tier="${slug}"], .dfo-uitweaks-scheme-${scheme} [data-dfo-tier="${slug}"] { --dfo-tier: ${c.hex};${c.ink ? ` --dfo-ink: ${c.ink};` : ''} }`);
+      rules.push(`.dfo-uitweaks-scheme-${scheme} [data-dfo-t2="${slug}"] { --dfo-tier2: ${c.hex}; }`);
     }
   }
   /* gems keep their own colour under every palette; the dot carries the grade */
   for (const [slug, hex] of Object.values(GEMS)) {
     rules.push(`.wplaque-row[data-tier="gem-${slug}"], [data-dfo-tier="gem-${slug}"] { --dfo-tier: ${hex}; --dfo-ink: ${hex}; }`);
+    rules.push(`[data-dfo-t2="gem-${slug}"] { --dfo-tier2: ${hex}; }`);
   }
   for (const grade of GEM_GRADES) {
     for (const [at, stone] of GEM_STONES.entries()) {
       const hex = GEMS[at][1];
       rules.push(`.wplaque-row[data-tier="gem-${grade}-${stone}"], [data-dfo-tier="gem-${grade}-${stone}"] { --dfo-tier: ${hex}; --dfo-ink: ${hex}; }`);
+      rules.push(`[data-dfo-t2="gem-${grade}-${stone}"] { --dfo-tier2: ${hex}; }`);
     }
   }
+  /* Ingredient icons, masked so they follow the row colour. */
+  rules.push(`
+:root.dfo-uitweaks-icons .pack-shell .itemrow[data-dfo-ing] .itemname > span::before {
+  content: ''; display: inline-block; width: 11px; height: 11px; margin-right: 6px;
+  vertical-align: -1px; background: currentColor;
+  -webkit-mask: var(--dfo-icon) center / contain no-repeat; mask: var(--dfo-icon) center / contain no-repeat;
+}
+${ICON_RULES}`);
+
+  /* Pack and loot-window rows: the same colour key the plaque uses. */
+  rules.push(`
+:root .pack-shell .itemrow[data-dfo-tier] .itemname > span:first-child { color: var(--dfo-ink, var(--dfo-tier)); }
+:root .pack-shell .itemrow[data-dfo-tier] .itemname > small { color: color-mix(in srgb, var(--dfo-ink, var(--dfo-tier)) 60%, #b9b2a1); }
+:root.dfo-uitweaks-gradient .pack-shell .itemrow[data-dfo-tier][data-dfo-t2] .itemname > span:first-child,
+:root.dfo-uitweaks-gradient .wplaque-row[data-tier][data-dfo-t2] > span:first-child {
+  background-image: linear-gradient(90deg, var(--dfo-ink, var(--dfo-tier)) 0%, var(--dfo-tier2, var(--dfo-ink, var(--dfo-tier))) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}`);
   /* Quest items: one magenta under every palette, on the plaque row and the card.
    * The row keeps its dot (unlike gems), so a quest item reads at a glance. */
   rules.push(`
@@ -528,7 +632,8 @@ function tierCss() {
 :root .wplaque-row[data-tier="${QUEST_SLUG}"].sel > span:first-child { text-shadow: 0 0 8px ${QUEST_HEX}; }
 /* the card: only the game's own "Quest item" line (below the name) takes the
  * colour; the name and the summary line stay as every other item's */
-:root body .card[data-dfo-tier="${QUEST_SLUG}"] .boundline { color: ${QUEST_HEX}; }`);
+:root body .card[data-dfo-tier="${QUEST_SLUG}"] .boundline { color: ${QUEST_HEX}; }
+:root [data-dfo-t2="${QUEST_SLUG}"] { --dfo-tier2: ${QUEST_HEX}; }`);
   return rules.join('\n');
 }
 function ensureStyle() {
@@ -541,6 +646,8 @@ function ensureStyle() {
 function applyColours() {
   const root = document.documentElement;
   root.classList.toggle('dfo-uitweaks-colours', !!cfg?.colours);
+  root.classList.toggle('dfo-uitweaks-gradient', !!cfg?.gradient);
+  root.classList.toggle('dfo-uitweaks-icons', cfg?.icons !== false);
   const want = `dfo-uitweaks-scheme-${cfg?.scheme}`;
   for (const cls of [...root.classList]) {
     if (cls.startsWith('dfo-uitweaks-scheme-') && cls !== want) root.classList.remove(cls);
@@ -613,8 +720,9 @@ function buildPane(container) {
 
   const note = document.createElement('div');
   note.style.cssText = 'color:var(--dim,#b9b2a1);font-size:12px;margin:6px 0 2px';
-  note.textContent = 'Loot piles (and any other world plaque) print a tier by material, then the weapon skill, armor class, armor/clothing slot and 1H/2H. Type / slot picks whether that type word is always shown, hidden when the name already says it (Formal Cloak, Longsword), or left off; the item card follows the same choice. The list length applies the next time the plaque refreshes (look away and back).';
+  note.textContent = 'Tiers, types and colours apply to the world plaque, the item card, and pack / loot-window rows. Changes apply the next time a plaque or window refreshes.';
   container.appendChild(note);
+  heading('Labels and tags');
   check('Tier labels', () => cfg.labels, (v) => { cfg.labels = v; save(); });
 
   // the type/slot dropdown: off, hide obvious, all
@@ -635,11 +743,16 @@ function buildPane(container) {
 
   check('Weapon hands (1H / 2H)', () => cfg.hands, (v) => { cfg.hands = v; save(); });
   check('Mark quest items (magenta, Quest: name)', () => cfg.quests, (v) => { cfg.quests = v; save(); });
+  check('Gradient names when an item has two colours', () => cfg.gradient, (v) => { cfg.gradient = v; save(); applyColours(); });
+  check('Ingredient icons', () => cfg.icons, (v) => { cfg.icons = v; save(); });
+  heading('Colours');
   check('Colour by material', () => cfg.colours, (v) => { cfg.colours = v; save(); applyColours(); });
 
   const schemes = [
     ['classic', 'Classic (Daggerfall colours)'],
     ['bright', 'Bright'],
+    ['colourblind', 'Colour-blind (blue / orange)'],
+    ['contrast', 'High contrast'],
   ];
   const schemeLine = line('flex-wrap:wrap;gap:4px 16px');
   schemeLine.appendChild(labelSpan('Colour scheme'));
@@ -656,13 +769,18 @@ function buildPane(container) {
       save();
       applyColours();
     };
+    const pal = PALETTES[value];
+    const swatch = document.createElement('span');
+    swatch.style.cssText = 'display:inline-block;width:26px;height:10px;border:1px solid var(--iron,#2b323b);background:'
+      + `linear-gradient(90deg, ${pal.iron.hex} 0 33%, ${pal.silver.hex} 33% 66%, ${pal.daedric.hex} 66% 100%)`;
     const span = document.createElement('span');
     span.textContent = label;
-    l.append(radio, span);
+    l.append(radio, swatch, span);
     schemeLine.appendChild(l);
   }
   container.appendChild(schemeLine);
 
+  heading('List');
   number('List rows', ROWS_MIN, ROWS_MAX, () => clampRows(cfg.rows), (v) => { cfg.rows = v; save(); });
 
 }
@@ -705,7 +823,7 @@ export function install() {
   cfg ??= load();
   ensureStyle();
   applyColours();
-  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, cardLine, tierOf: materialSlug, isQuest };
+  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, cardLine, tierOf: materialSlug, isQuest, rowName, tierTags, decorateRow };
   watchPlaque();
   liftTimer ??= setInterval(watchPlaque, 400);
 }
@@ -713,6 +831,7 @@ export function install() {
 export function unmount() {
   if (globalThis.__dfoUiTweaks) delete globalThis.__dfoUiTweaks;
   document.documentElement.classList.remove('dfo-uitweaks-colours');
+  document.documentElement.classList.remove('dfo-uitweaks-gradient', 'dfo-uitweaks-icons');
   for (const scheme of SCHEMES) document.documentElement.classList.remove(`dfo-uitweaks-scheme-${scheme}`);
   if (liftTimer) { clearInterval(liftTimer); liftTimer = null; }
   if (plaqueRO) { plaqueRO.disconnect(); plaqueRO = null; }

@@ -109,6 +109,14 @@ const B_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts){
 const B_CARD = A_CARD + B_FACTS;
 
 const A_ROWS_FALLBACK = 'function Pf(e,t=-1,n=0,r=6){';
+/* the pack/loot-window row: name + the small meta line, built in the same
+ * chunk as the card. Rows are `button.itemrow` with `span.itemname`. */
+const ROW_NAME = 'c.append(W(`span`,null,n.name+(n.stack?` ×${n.stack}`:``)));';
+const ROW_NAME_NEW = 'c.append(W(`span`,null,(globalThis.__dfoUiTweaks?.rowName?.(e,n.name)??n.name)+(n.stack?` ×${n.stack}`:``)));';
+const ROW_META = 'let l=[n.material,n.word,n.lit?`lit`:null,n.quest==null?null:Fo()].filter(Boolean).join(` · `);';
+const ROW_META_NEW = 'let l=globalThis.__dfoUiTweaks?.cardLine?.(e)||[n.material,n.word,n.lit?`lit`:null,n.quest==null?null:Fo()].filter(Boolean).join(` · `);';
+const ROW_DECOR = 'El(o,e);let s=P===e&&F===t;';
+const ROW_DECOR_NEW = 'El(o,e),globalThis.__dfoUiTweaks?.decorateRow?.(o,e);let s=P===e&&F===t;';
 const ROWS_RX = /function ([A-Za-z0-9_$]+)\(e,t=-1,n=0,r=6\)\{let i=e\?\.rows\?\.length\?\?0;if\(!e\|\|e\.kind!==`items`/;
 const A_FILTER = ',item:e})),r=n.slice(0,t)';
 /* the loot filter is its own mod; the row builder calls this generic hook so
@@ -310,9 +318,20 @@ function installNow() {
         }
       } else log(`  card meta line already applied (${card.rel})`);
 
+      /* the pack and loot-window rows share one builder: label, tag line and colour key */
+      if (!text.includes('rowName?.')) {
+        if (!text.includes(ROW_NAME) || !text.includes(ROW_META) || !text.includes(ROW_DECOR)) {
+          die('the pack/loot row builder anchor was not found - aborting (nothing written)');
+        }
+        text = text.replace(ROW_NAME, ROW_NAME_NEW).replace(ROW_META, ROW_META_NEW).replace(ROW_DECOR, ROW_DECOR_NEW);
+        log(`  patched ${card.rel} (pack/loot rows)`);
+      } else log(`  pack/loot rows already patched (${card.rel})`);
+
       store.write(card.rel, Buffer.from(text));
       checks.push({ rel: card.rel, has: 'dataset.dfoTier' });
       checks.push({ rel: card.rel, has: 'cardLine?.' });
+      checks.push({ rel: card.rel, has: 'rowName?.' });
+      checks.push({ rel: card.rel, has: 'decorateRow?.' });
     }
 
     // ---- 5. the mod itself ----------------------------------------------

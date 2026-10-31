@@ -205,8 +205,15 @@ The item card's summary line follows the same choice.
 
 **ESC → Mods → UI Tweaks**: **Tier labels**, **Type / slot** (Off / Hide obvious
 / All), **Weapon hands (1H / 2H)**, **Mark quest items** (magenta, `Quest: name`),
-**Colour by material**, **Colour scheme** (Classic / Bright), and **List rows**
-(3–20; the game's default is 6).
+**Gradient names**, **Ingredient icons**, **Colour by material**, **Colour
+scheme** (Classic / Bright / Colour-blind blue-orange / High contrast), and
+**List rows** (3–20; the game's default is 6).
+
+Pack and loot-window rows get the same treatment: the name takes the material
+colour (quest items magenta), the line under it is the card line (`T4 · Steel ·
+Long Blade · 1H`), and an item with two colours (quest + gem, quest + metal)
+fades between them when **Gradient names** is on. Ingredient rows get a small
+glyph by kind (herb, fungus, mineral, flower, animal).
 
 Rows are coloured by material (a dot and the name) in the Classic Daggerfall
 palette or a brighter one; a magic/rare/legendary row keeps the game's rarity

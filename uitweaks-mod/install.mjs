@@ -318,6 +318,20 @@ function installNow() {
         }
       } else log(`  card meta line already applied (${card.rel})`);
 
+      /* A row's condition word ("New", "Worn") and the generic "quest item"
+       * line are noise: drop the condition, and let a quest item show its quest
+       * there instead. Works on both the fresh and the already-patched text. */
+      const COND = '[n.material,n.word,n.lit?`lit`:null,n.quest==null?null:Fo()]';
+      const COND_NEW = '[n.material,n.lit?`lit`:null,n.quest==null?null:(n.quest||`Quest`)]';
+      if (text.includes(COND)) {
+        text = text.replace(COND, COND_NEW);
+        log(`  rows: condition word dropped, quest name in its place (${card.rel})`);
+      }
+      if (text.includes('Io(a.quest)')) {
+        text = text.replace('Io(a.quest)', '(a.quest||`Quest`)');
+        log(`  card: quest name instead of "Quest item" (${card.rel})`);
+      }
+
       /* the pack and loot-window rows share one builder: label, tag line and colour key */
       if (!text.includes('rowName?.')) {
         if (!text.includes(ROW_NAME) || !text.includes(ROW_META) || !text.includes(ROW_DECOR)) {

@@ -45,10 +45,11 @@ Windows (double-click or from a command prompt):
 install.bat
 ```
 
-Each script installs the loader, every mod, and the **DFO Online (Mods)**
-launcher, then prints the health check. It is idempotent — run it again any
-time (including after a game update) to repair the install. There is **no
-background service**; the launcher syncs once when you start the game.
+Each script checks which mods apply to the build the game plays, removes the
+background sync that earlier versions set up, and creates the **DFO Online
+(Mods)** shortcut. Nothing is written into the game: the mods are applied as the
+game starts, so there is nothing to repair after an update. Running it again is
+harmless.
 
 On a portable/unpacked build, pass the game once so the launcher can find it
 later:
@@ -58,70 +59,56 @@ later:
 install.bat "C:\path\to\DFO Online"
 ```
 
-### Manual
-
-To sync the loader and every mod without the launcher script:
+### Checks
 
 ```bash
-node modloader/sync.mjs
+node modloader/check.mjs                                  # which mods apply to the build the game plays
+node modloader/check.mjs --app="/path/to/DFO Online"      # when the game is not started yet
 ```
 
-A single mod can be installed or repaired on its own with
-`node <mod>/install.mjs` (for example `node uitweaks-mod/install.mjs`).
+The check applies every mod to the build in memory and writes nothing. It exits
+0 when every mod applies, 1 when some do not (the rest still work), and 2 when
+the build cannot be read yet (start the game once, or pass `--app=`).
 
-### Checks and removal
-
-```bash
-node modloader/install.mjs --check        # 0 healthy, 1 stale, 2 nothing patchable yet
-node skillhud-mod/install.mjs --check
-node uitweaks-mod/install.mjs --check
-node lootfilter-mod/install.mjs --check
-
-node skillhud-mod/install.mjs --uninstall  # this mod only; loader/mods stay
-node uitweaks-mod/install.mjs --uninstall
-node lootfilter-mod/install.mjs --uninstall
-node modloader/install.mjs --uninstall     # refuses while mods are registered
-node modloader/install.mjs --uninstall --force
-```
-
-Re-running an installer is safe and idempotent.
+Node.js 18 or newer runs the scripts. A portable copy works too: put it at
+`node/bin/node` (Linux/macOS) or `node\node.exe` (Windows) in this folder, or set
+`DFO_NODE` to its path.
 
 ## Starting the game
 
-The installers create a **DFO Online (Mods)** shortcut (desktop entry, desktop
-shortcut, or `play.command`). Use it instead of the game's own icon:
+The **DFO Online (Mods)** shortcut (desktop entry, desktop shortcut, or
+`play.command`) runs `modloader/play.mjs`. Use it instead of the game's own icon:
 
-- It starts the game, waits for the build the game bundles to be readable, runs
-  `node modloader/sync.mjs` once, and leaves you at the game's Play screen.
-- On an installed Windows/macOS build the build is on disk, so it syncs *before*
-  the launcher opens; on Linux it waits for the AppImage mount, so press Play
-  after the launcher appears.
-- If the game is already running, it only syncs — no second copy.
-- Nothing runs in the background; the script exists only while it starts the
-  game.
+- It starts a small server on `127.0.0.1` (a free port, chosen each time). The
+  server answers for the game's files: the build the store plays, with the mods
+  applied as they are read. Then it starts the launcher pointed at that address.
+- It stays up while the game runs and stops when the game closes. Nothing runs
+  in the background.
+- The game store is never written. A channel update cannot undo the mods: the
+  next game load sees the new build and applies the mods to it again.
+- If a mod does not apply to a new build (its anchors moved), the rest still
+  work and `node modloader/check.mjs` names the mod that is out.
+- If the game is already running, the shortcut says so and stops. Close it and
+  start again: the mods only apply to a game started through the shortcut.
 
-`node modloader/play.mjs --sync-only` re-syncs without launching (handy when the
-game is already open); `--dry-run` prints the paths it would use. The resolved
-game path is remembered in `modloader/game-path.txt`; pass `--app=` once if
-detection fails:
+Anything after `--` goes to the game. The resolved game path is remembered in
+`modloader/game-path.txt`; pass `--app=` once if detection fails:
 
 ```bash
 node modloader/play.mjs --app="/path/to/DFO Online.AppImage"
 node modloader/play.mjs --app="C:\Program Files\DFO Online\DFO Online.exe"
 ```
 
-### After a game update
+### What this changes
 
-A **channel update** stages a new version while you play; the next launch uses
-it and the launcher patches it before you press Play. A **launcher update** (a
-new AppImage, `.exe` or `.dmg`) resets the store and the game plays its bundled
-copy; the loader builds a local overlay (the bundled build plus the mods) and
-points the game at it. If a patch lands while the game page is already loading,
-restart once.
-
-The older `node modloader/install.mjs --install-watch` background watcher still
-exists for anyone who wants it, but the installers no longer set it up;
-`--remove-watch` removes one left by an earlier version.
+- **Rollback is off for modded play.** The launcher normally falls back to the
+  previous build when a new channel build fails to start. Through the server the
+  game window skips that check, so a broken channel build stays current until a
+  fixed one ships. Play without the mods to keep the automatic fallback.
+- **The game's address is local.** Its pages load from `127.0.0.1` rather than
+  `dagger://`. Online login was reported working with this launch path.
+- **Tested on Linux only** for this launch path. Windows and macOS are not yet
+  tested with the server.
 
 ## The Mods menu
 
@@ -277,30 +264,24 @@ turns the old switches into rules, so nothing is lost. The old
 
 ## Troubleshooting
 
-- `node modloader/install.mjs --check` (and a mod's `--check`) says what is
-  wrong: “not installed”, “installed for vX, serving vY”, “the game plays its
-  bundled copy”.
-- If the bundled build could not be read: start the game once and retry (the
-  Linux AppImage needs its mount; the Windows portable needs its unpacked
-  folder), or pass `--app=`.
-- If the **Mods** pane is blank right after a game update, the game started
-  before the sync finished. Restart once (or use the launcher) and the pane,
-  settings, and credit/link load normally.
-- Force a full re-install by deleting `Game/.dfo-mods/installed.json` and
-  running `node modloader/sync.mjs` (or the launcher).
+- `node modloader/check.mjs` says which mods apply to the current build and why
+  a mod was left out.
+- “the build is not readable yet” (the game page shows it): start the game once
+  and reload. The Linux AppImage needs its mount; the Windows portable needs its
+  unpacked folder. Or pass `--app=`.
+- “the game is already running”: close it and start through the shortcut.
 - In game, **ESC → Mods → Reload** re-reads the mod files; it does not need a
   page reload.
 
 ## Notes
 
-- `Game/.dfo-mods/installed.json` records the loader and every mod; it is
-  machine-local.
-- Backups of the release's own files live in `Game/.dfo-mods/originals.json`,
-  keyed by version. Uninstall restores only the version being uninstalled.
-- Uninstalling a mod leaves the loader and the other mods in place; remove the
-  loader itself with `node modloader/install.mjs --uninstall`.
-- The overlay built after a launcher update is one version number above the
-  seed and is superseded by the next real release.
+- Earlier versions wrote the mods into the game store (an overlay folder,
+  `Game/.dfo-mods/installed.json` and `originals.json`). This version does not
+  read those files, and the mods recognise their own changes if they are still
+  there, so nothing needs cleaning up. The next channel build replaces them.
+- The mods live in their folders (`loot filter`, `skill tracker`, `UI tweaks`,
+  each with a `patches.mjs`) and are found automatically; a new mod folder with a
+  `patches.mjs` needs no other registration.
 
 See [DEVELOPING.md](DEVELOPING.md) for the loader contract, patch lists, anchor
 philosophy, and the full skill formula.

@@ -1,23 +1,11 @@
-#!/usr/bin/env node
 /*
- * DFO Online - Loot Filter installer.
+ * DFO Online - Loot Filter patches.
  *
- * A MOD installer: it assumes the shared loader (../modloader) and asks it to
- * install itself first. It patches:
- *
- *   assets/propBodies-*.js       the shared row-filter hook (idempotent - UI
- *                                Tweaks installs the same line)
- *   assets/world-*.js            exposes the dropped-pile manager (__dfoPiles)
- *                                and the foe manager (__dfoFoes)
- *   assets/deepWaterRuntime-*.js the corpse body + corpse-sprite draw guards
- *   assets/dfo-lootfilter.js     the mod (rules + ESC pane)
- *   assets/dfo-mods/registry.js  one entry pointing at the mod
- *
- *   node install.mjs                 install/repair
- *   node install.mjs --if-needed     check first
- *   node install.mjs --check         0 healthy, 1 stale, 2 nothing paged yet
- *   node install.mjs --uninstall     restore this mod's file, leave the loader
- *   node install.mjs --install-watch / --remove-watch
+ * The mod's patch, as text. patch(store, log) reads the served chunks it needs
+ * through `store`, a read-only view of the build the game plays (modloader/lib/
+ * view.mjs), and writes the changed ones back plus the mod's module file. Nothing
+ * is written to the game store: modloader/lib/serve.mjs runs this against each
+ * build and serves the result.
  */
 'use strict';
 
@@ -25,49 +13,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sha256 } from '../modloader/lib/game.mjs';
-import {
-  inspectTarget, prepare, openStore, finalizeOverlay, Deferred, MODLOADER_ROOT,
-} from '../modloader/lib/store.mjs';
-import { readMarker, writeMarker, modEntry, removeModEntry } from '../modloader/lib/marker.mjs';
-import { ensureLoader, loaderStatus, loaderRecord } from '../modloader/lib/loader.mjs';
-import {
-  readRegistry, upsertRegistry, removeRegistry, upsertManifest, removeManifest,
-} from '../modloader/lib/registry.mjs';
-import { installWatch, removeWatch } from '../modloader/lib/autosync.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MOD_SRC = path.join(HERE, 'lootfilter.js');
-const MODULE_REL = 'assets/dfo-lootfilter.js';
-const ID = 'lootfilter';
-const NAME = 'Loot Filter';
-const SPEC = '../dfo-lootfilter.js';
-const MANIFEST_DIR = path.relative(MODLOADER_ROOT, HERE).split(path.sep).join('/');
+export const MODULE_REL = 'assets/dfo-lootfilter.js';
+export const ID = 'lootfilter';
+export const NAME = 'Loot Filter';
+export const SPEC = '../dfo-lootfilter.js';
 
-const argv = process.argv.slice(2);
-const args = {
-  check: argv.includes('--check'),
-  ifNeeded: argv.includes('--if-needed'),
-  uninstall: argv.includes('--uninstall'),
-  installWatch: argv.includes('--install-watch'),
-  removeWatch: argv.includes('--remove-watch'),
-  noOverlay: argv.includes('--no-overlay'),
-  quiet: argv.includes('--quiet'),
-  force: argv.includes('--force'),
-  seed: (argv.find((a) => a.startsWith('--seed=')) || '').slice('--seed='.length) || null,
-  app: (argv.find((a) => a.startsWith('--app=')) || '').slice('--app='.length) || null,
-  help: argv.includes('--help') || argv.includes('-h'),
-};
-const log = (...a) => { if (!args.quiet) console.log(...a); };
-const die = (msg, code = 1) => { console.error(`lootfilter: ${msg}`); process.exit(code); };
-
-if (args.help) {
-  console.log(`usage: node install.mjs [--check|--if-needed|--uninstall|--install-watch|--remove-watch]
-                  [--no-overlay] [--app=<app.asar|app folder>] [--seed=<extracted dist>]
-                  [--quiet] [--force]`);
-  process.exit(0);
-}
-
-const buildOpts = () => ({ seedDir: args.seed, app: args.app, noOverlay: args.noOverlay, log });
+const die = (msg) => { throw new Error(msg); };
 
 /** The same hash boot.js compares: the module text with MOD_BUILD emptied. */
 function computeBuild() {
@@ -77,10 +31,7 @@ function computeBuild() {
   return sha256(Buffer.from(stripped, 'utf8')).slice(0, 16);
 }
 
-function deferOrDie(msg, seed) {
-  if (!seed) throw new Deferred(msg);
-  die(msg);
-}
+function deferOrDie(msg) { die(msg); }
 
 /* --------------------------------------------------- the pile manager */
 /* The dropped-loot manager owns the 3-D pile sprites. Expose it so the mod can
@@ -182,52 +133,12 @@ function ensureQuickState(text) {
   };
 }
 
-/* ----------------------------------------------------------------- check */
-function checkInstalled() {
-  const { state, target } = inspectTarget();
-  if (!state) return { ok: false, code: 2, why: 'no state.json - launch the game once first' };
-  if (!target) {
-    return {
-      ok: false, code: 2,
-      why: state.current
-        ? `v${state.current} is current but its index does not read`
-        : `the game plays its bundled copy (v${state.seed}); no channel build to patch yet`,
-    };
-  }
-  const marker = readMarker();
-  if (!marker || marker.version !== target.version) return { ok: false, why: `not installed for v${target.version}` };
-  const store = openStore(target, null);
-  if (!loaderStatus(store, marker)) return { ok: false, why: 'the mod loader is missing or stale' };
-  const rec = modEntry(marker, ID);
-  if (!rec) return { ok: false, why: `not installed for v${target.version}` };
-  if (rec.build !== computeBuild()) return { ok: false, why: 'lootfilter.js changed since the install' };
-  for (const [rel, want] of Object.entries(rec.files || {})) {
-    const e = store.byPath.get(rel);
-    if (!e || !e.own || e.size !== want.size || e.sha256 !== want.sha256) return { ok: false, why: `${rel} is not the installed copy` };
-    try { if (fs.statSync(path.join(store.vFiles, rel)).size !== want.size) return { ok: false, why: `${rel} has the wrong size` }; }
-    catch { return { ok: false, why: `${rel} is missing` }; }
-  }
-  for (const c of rec.checks || []) {
-    const got = store.read(c.rel);
-    if (!got || !got.bytes.toString('utf8').includes(c.has)) return { ok: false, why: `${c.rel} no longer has the loot-filter hook` };
-  }
-  if (!readRegistry(store).some((m) => m.id === ID)) return { ok: false, why: 'not registered with the loader' };
-  return { ok: true, version: target.version, overlay: !!marker.overlay };
-}
-
 /* --------------------------------------------------------------- install */
-function installNow() {
-  const build = prepare(buildOpts());
-  if (build.error) { console.error(`lootfilter: ${build.error}`); return 2; }
-  const store = build.store;
-  const { state, seed, target, overlay } = build;
-  try {
-    log(`game version ${store.version}, ${overlay ? 'local overlay' : `channel build (playing v${target.live})`}`);
-
-    const loader = ensureLoader(store, { log });
-    const installed = new Set();
-    const checks = [];
-
+export function patch(store, log = () => {}) {
+  const seed = null;
+  const installed = new Set();
+  const checks = [];
+  let layoutName = null;
     // ---- 1. expose the dropped-pile manager (3-D pile sprites) ----------
     {
       const world = store.findChunk({
@@ -326,91 +237,4 @@ function installNow() {
     installed.add(MODULE_REL);
     log(`  MOD_BUILD ${buildId}`);
 
-    // ---- 5. register with the loader -------------------------------------
-    upsertRegistry(store, { id: ID, name: NAME, spec: SPEC });
-
-    // ---- 6. one atomic index write, then name an overlay -----------------
-    store.commit();
-    finalizeOverlay(build);
-
-    // ---- 7. installed.json: loader + this mod's file ---------------------
-    const marker = readMarker();
-    const sameVersion = marker?.version === store.version;
-    const next = {
-      ...(sameVersion ? marker : {}),
-      version: store.version,
-      overlay: !!overlay,
-      seed: state.seed,
-      at: new Date().toISOString(),
-      loader: loaderRecord(store, loader),
-      mods: {
-        ...(sameVersion ? (marker.mods ?? {}) : {}),
-        [ID]: { build: buildId, files: store.fileMap(installed), checks },
-      },
-    };
-    writeMarker(next);
-    upsertManifest({ id: ID, name: NAME, dir: MANIFEST_DIR });
-
-    log(overlay
-      ? `\nDone. The game plays v${store.version}; restart it once if it is running.`
-      : '\nDone. ESC -> Mods -> Loot Filter has the rules.');
-    return 0;
-  } catch (e) {
-    if (e instanceof Deferred) { log(e.message); return 2; }
-    throw e;
-  } finally {
-    seed?.close?.();
-  }
-}
-
-/* --------------------------------------------------------------- uninstall */
-function uninstall() {
-  const { state, target } = inspectTarget();
-  const marker = readMarker();
-  const version = target?.version || marker?.version || state?.current || null;
-  if (target) {
-    const store = openStore(target, null);
-    const rec = modEntry(marker, ID);
-    const rels = new Set([MODULE_REL]);
-    if (marker?.version === store.version && rec?.files) for (const rel of Object.keys(rec.files)) rels.add(rel);
-    for (const rel of rels) store.remove(rel, { owned: rel === MODULE_REL });
-    removeRegistry(store, ID);
-    store.commit();
-  }
-  removeManifest(ID);
-  if (marker) writeMarker(removeModEntry(marker, ID));
-  log(version ? `uninstalled from v${version} (the hook stays inert; the loader stays installed)` : 'nothing to uninstall');
-  return 0;
-}
-
-/* -------------------------------------------------------------------- main */
-try {
-  if (args.removeWatch) { removeWatch(); process.exit(0); }
-  if (args.installWatch) {
-    const c = checkInstalled();
-    if (!c.ok) { log(c.why); try { installNow(); } catch (e) { console.error(`lootfilter: ${e?.message || e}`); } }
-    installWatch();
-    process.exit(0);
-  }
-  if (args.uninstall) process.exit(uninstall());
-
-  if (args.check) {
-    const c = checkInstalled();
-    log(c.ok
-      ? `up to date: v${c.version}${c.overlay ? ' (local overlay)' : ''}`
-      : `needs install: ${c.why}`);
-    process.exit(c.ok ? 0 : (c.code || 1));
-  }
-
-  if (args.ifNeeded && !args.force) {
-    const c = checkInstalled();
-    if (c.ok) { log(`up to date: v${c.version}${c.overlay ? ' (local overlay)' : ''}`); process.exit(0); }
-    log(c.why);
-  }
-
-  const code = installNow();
-  process.exit(args.ifNeeded && code === 2 ? 0 : code);
-} catch (e) {
-  console.error(`lootfilter: ${e?.stack || e}`);
-  process.exit(1);
 }

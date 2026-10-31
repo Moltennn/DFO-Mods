@@ -26,13 +26,8 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo [dfo-mods] installing the loader and every mod (node: %NODE%)
-"%NODE%" "modloader\sync.mjs"
-if errorlevel 1 goto fail
-
-echo.
-echo [dfo-mods] removing any background watcher ^(the shortcut replaces it^)
-"%NODE%" "modloader\install.mjs" --remove-watch
+echo [dfo-mods] removing the old background sync, then checking the mods (node: %NODE%)
+"%NODE%" "modloader\install.mjs"
 
 echo.
 echo [dfo-mods] setting up the "DFO Online (Mods)" desktop shortcut
@@ -40,13 +35,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObjec
 if errorlevel 1 goto fail
 echo shortcut: %USERPROFILE%\Desktop\DFO Online (Mods).lnk
 
-echo.
-echo [dfo-mods] checking
-"%NODE%" "modloader\install.mjs" --check
-if errorlevel 1 goto fail
-for /d %%D in (*-mod) do (
-  if exist "%%D\install.mjs" "%NODE%" "%%D\install.mjs" --check
-)
 
 echo.
 echo Done. Start the game from the "DFO Online (Mods)" desktop shortcut.

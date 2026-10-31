@@ -7,69 +7,68 @@ breaks an anchor. For install/use, see [README.md](README.md).
 ## Repository layout
 
 ```
-install.sh / install.bat     one-step install/repair + launcher shortcut
+install.sh / install.bat     check the mods + create the launcher shortcut
 play.sh / play.command       launcher entry points (Linux/macOS)
 play.bat                     launcher entry point (Windows)
+find-node.sh / find-node.bat locate Node.js 18+ (DFO_NODE, node/, then PATH)
 modloader/
-  boot.js                    served as assets/dfo-mods/boot.js
-  install.mjs                install/check/uninstall the loader
-  play.mjs                   start the game, wait for its seed, sync once
-  sync.mjs                   one sync: loader + every registered mod
+  play.mjs                   start the game: the server, then the launcher
+  check.mjs                  apply every mod to the build the game plays, in memory
+  install.mjs                remove the old background sync, then run the check
+  boot.js                    the loader, served as assets/dfo-mods/boot.js
   lib/
-    game.mjs                 version store + seed discovery
-    store.mjs                open a served build; overlay; read/write/remove
-    marker.mjs               Game/.dfo-mods/installed.json
-    registry.mjs             served registry.js + workspace manifest
-    loader.mjs               ensure/check/remove the loader
-    autosync.mjs             optional background watcher (legacy, not installed)
+    view.mjs                 the build the game plays, read-only, with an in-memory overlay
+    mods.mjs                 discover ../*-mod/patches.mjs; run patches; the registry
+    serve.mjs                the local server the launcher loads the game from
+    game.mjs                 store state, seed discovery, asar reader
+    watch-cleanup.mjs        removes a background sync left by an earlier version
 skillhud-mod/
   skillhud.js                the mod (HUD + ESC pane)
-  install.mjs                its patches + registration
+  patches.mjs                its patches, as text (patch(store, log))
 uitweaks-mod/
   uitweaks.js                the mod (plaque labels/colours + ESC pane)
-  install.mjs                its patches + registration
+  patches.mjs                its patches, as text
 lootfilter-mod/
   lootfilter.js              the mod (hide rules + ESC pane)
-  install.mjs                its hook + registration
+  patches.mjs                its patches, as text
 ```
 
-`modloader/mods.json` (workspace manifest), `modloader/app-path.txt`,
-`modloader/game-path.txt` and `modloader/win-sync.vbs` are generated on each
-machine and are not tracked.
+`modloader/app-path.txt` and `modloader/game-path.txt` are local hints, written
+when a path is given with `--app`; they are not tracked.
 
 ## How the game build is chosen
 
-The launcher keeps a version store in `Game/`:
+The store (`Game/`, in the user data folder) has:
 
 - `state.json` — `seed`, `current`, `ready`, `previous`.
 - `v<version>/index.json` — per-file `sha256`/`size`/`own`. `own: false` means
   the file comes from the build the launcher ships (the **seed**); `own: true`
   means it lives in the version folder.
 
-The installers patch **the build the game will play**, preferring `ready`
-(staged while playing; the next launch activates it) over `current`. If neither
-exists, they build a **local overlay**: a version folder from the seed's own
-`game-seed.json` plus the patched files, numbered `seed + 1`, marked with
-`.dfo-overlay.json`, and point `state.current` at it. The next real release
-supersedes it.
+`lib/view.mjs` reads the build the launcher would serve, the same way the
+launcher does: a path the version's index names is its own file when `own`, else
+the seed's; a path the index does not name is not served. `ready` is the next
+build and `current` the one played now; `chooseTarget` picks between them as the
+launcher does.
 
-Seed bytes come from the running build:
+Nothing is written to the store. The patches run against an in-memory copy of
+the build on each channel change, and the server answers from that copy. The
+store's own update rules (staging, activation, rollback) are untouched.
 
-- Linux: the AppImage mount (`/tmp/.mount_*/resources/app.asar`), or a path
-  given with `--app`/`DFO_APP`.
-- Windows/macOS: `<install>/resources/app.asar`, found from the running process
-  first, then the usual install folders.
-- The workspace `extract/` is a last resort and only when its `package.json`
-  version matches the store seed (it goes stale after a launcher update).
-
-`--seed=<extracted dist>` points at an extracted build's `resources/app/dist`.
-`resolveSeed` refuses a build whose version does not match the seed.
+The seed comes from the running build: the AppImage mount on Linux (or
+`--app`/`DFO_APP`), `<install>/resources/app.asar` on Windows/macOS, and the
+workspace `extract/` only when its version matches. `resolveSeed` refuses a
+build whose version does not match.
 
 ## The loader
 
-The installer tags `play/index.html` with
-`<script type="module" src="../assets/dfo-mods/boot.js">`, writes
-`assets/dfo-mods/boot.js` and an `assets/dfo-mods/registry.js`:
+The server serves the loader; nothing is written to the game:
+
+- `play/index.html` gets `<script type="module" src="../assets/dfo-mods/boot.js">`
+  before `</body>`, when it is not already there.
+- `assets/dfo-mods/boot.js` is `modloader/boot.js`.
+- `assets/dfo-mods/registry.js` is generated per build from the mods that
+  applied:
 
 ```js
 export const MODS = [
@@ -87,7 +86,7 @@ A mod module exports:
 
 | export | purpose |
 |---|---|
-| `MOD_BUILD` | a hash of the module text (injected by the installer); a changed value means “replace the running instance” on reload |
+| `MOD_BUILD` | a hash of the module text (injected by the patches); a changed value means “replace the running instance” on reload |
 | `install()` | mount the mod — called by the loader, never at import time |
 | `unmount()` | remove everything `install()` added |
 | `mountPane(container)` | optional; the loader gives it its own section in ESC → Mods |
@@ -99,46 +98,41 @@ DevTools hooks: `globalThis.__dfoReloadMods()`,
 `globalThis.__dfoModsReloadOne(id)`, `globalThis.__dfoModsList()`,
 `globalThis.__dfoModsPane(el)`.
 
-The installer records the loader and each mod in
-`Game/.dfo-mods/installed.json` (marker). Files that two installers share
-(the plaque row chunk, the corpse chunk) are recorded as **content checks**
-(`{rel, has}`) rather than a whole-file hash, so either installer can write the
-chunk last; owned module files stay hash-tracked.
+Chunks that two mods patch are handled by the patches themselves: each one
+checks for its own marker (or the other's), so either can run first.
 
 ## Adding a mod
 
-Make a folder beside `modloader/` with an installer and a module, and use the
-loader's toolkit:
+Make a folder beside `modloader/` with a `patches.mjs` and the mod's module:
 
 ```js
-import { prepare, finalizeOverlay } from '../modloader/lib/store.mjs';
-import { readMarker, writeMarker, setModEntry } from '../modloader/lib/marker.mjs';
-import { ensureLoader, loaderStatus, loaderRecord } from '../modloader/lib/loader.mjs';
-import { upsertRegistry, upsertManifest } from '../modloader/lib/registry.mjs';
+export const ID = 'mymod';
+export const NAME = 'My Mod';
+export const SPEC = '../dfo-mymod.js';        // relative to assets/dfo-mods/
+export const MODULE_REL = 'assets/dfo-mymod.js';
 
-const build = prepare({ log: console.log });      // the build the game will play
-const store = build.store;
-const loader = ensureLoader(store, { log: console.log });
-
-// patch/read/write through store:
-//   store.findChunk({ ... })
-//   store.write('assets/my-mod.js', bytes, { owned: true })
-//   store.remove('assets/some-patch.js')
-
-upsertRegistry(store, { id: 'mymod', name: 'My Mod', spec: '../my-mod.js' });
-store.commit();                                    // index.json, atomically
-finalizeOverlay(build);                            // names a fresh overlay
-upsertManifest({ id: 'mymod', name: 'My Mod', dir: '../my-mod' });
+export function patch(store, log = () => {}) {
+  // store: a read-only view of the build the game plays
+  //   store.findChunk({ prefixes, maxSize, fallbackMinSize, test })  -> { rel, text }
+  //   store.read(rel)                                                  -> { bytes } | null
+  //   store.write(rel, bytes)                                          -> changed?
+  // Throw when an anchor is missing: the mod is then left out of this build
+  // and every other mod still applies.
+  const chunk = store.findChunk({ test: (t) => t.includes('some anchor') });
+  if (!chunk) throw new Error('the anchor chunk was not found');
+  store.write(chunk.rel, Buffer.from(chunk.text.replace('some anchor', 'patched anchor')));
+  store.write(MODULE_REL, Buffer.from(/* the module text */ ''));
+}
 ```
 
-Record the loader and mod in the marker so `--check` can verify them, and
-support `--check`, `--if-needed` and `--uninstall`. `--install-watch` is a
-legacy opt-in. `skillhud-mod/` is the reference implementation.
+`modloader/lib/mods.mjs` finds every `../*-mod/patches.mjs` in id order, so there
+is no registration to edit. `node modloader/check.mjs` shows whether the patch
+applies to the current build. `skillhud-mod/patches.mjs` is the reference.
 
 **Anchors are structural.** Chunk names and minified identifiers change every
-release; installers locate code by a unique shape (a literal, an expression,
-a call pattern), capture the renamed identifiers, and abort before writing when
-an anchor is missing. Do not add name-based matching.
+release; patches locate code by a unique shape (a literal, an expression, a call
+pattern), capture the renamed identifiers, and throw before writing when a shape
+is missing.
 
 ## Skill Tracker
 
@@ -295,41 +289,35 @@ Runtime pieces:
 
 ## Launcher
 
-`modloader/play.mjs` is the only thing the shortcut runs:
+`modloader/play.mjs` is what the shortcut runs:
 
 1. resolves the game (workspace `*.AppImage`, `game-path.txt`, installed
    asar→exe/app, or `--app=`),
-2. syncs before launch when the seed is already readable (installed
-   Windows/macOS), otherwise launches and waits up to 45 s for the seed
-   (Linux AppImage mount),
-3. runs `modloader/sync.mjs` once and exits; the game is detached.
+2. starts `lib/serve.mjs` on `127.0.0.1` (an OS-chosen port),
+3. starts the launcher with `DAGGER_DEV_URL` set to that server's game page,
+   and stays up while the game runs (the launcher can restart itself, so it waits
+   for the game to close, not just for its own child).
 
-`--sync-only` syncs without launching; `--dry-run` prints the resolved paths.
-If the game is already running, only the sync runs. `game-path.txt` and
-`app-path.txt` are local hints; the installers write them when given `--app`.
+Everything after `--` goes to the game. If the game is already running, the
+wrapper says so and exits: the mods only apply to a game it started.
 
-The old background watcher (`node modloader/install.mjs --install-watch`) is
-still in `lib/autosync.mjs` for anyone who wants it (systemd/launchd/schtasks);
-it is not installed by default and `install.sh`/`install.bat` remove one left by
-an earlier version.
+`DAGGER_DEV_URL` makes the launcher return early when it opens the game window,
+so the window skips the rollback, load-failure and crash handlers that run for
+`dagger://` games. This is the accepted trade-off for modded play (README,
+"What this changes").
 
-## Checks, backups, uninstall
+## Checks
 
 ```bash
-node modloader/install.mjs --check
-node skillhud-mod/install.mjs --check
-node uitweaks-mod/install.mjs --check
-node lootfilter-mod/install.mjs --check
+node modloader/check.mjs                 # which mods apply to the build the game plays
+node modloader/check.mjs --app=<path>    # when the game is not running yet
 ```
 
-Exit codes: 0 healthy, 1 stale, 2 nothing patchable right now (no seed).
+Exit codes: 0 every mod applies, 1 some do not (their anchors moved), 2 the build
+cannot be read yet (no state, or the seed is not readable).
 
-Backups of the release's own files live in `Game/.dfo-mods/originals.json`,
-keyed by version; uninstall restores only the version being uninstalled.
-Deleting `Game/.dfo-mods/installed.json` forces a full re-install on the next
-sync. `node modloader/install.mjs --uninstall` refuses while mods are
-registered; `--force` overrides.
+Earlier versions wrote into the store (`Game/.dfo-mods/`, overlay folders,
+`installed.json`, `originals.json`). Nothing reads those any more; a patch
+recognises its own changes if they are still in a build, so they do no harm.
+Uninstalling is removing the mod's folder.
 
-The overlay is one version number above the seed. If the next release happens
-to have that number, the channel skips it; a launcher update still delivers it
-and everything is re-applied to the new seed.

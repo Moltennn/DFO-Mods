@@ -27,7 +27,7 @@ done
 . ./modloader/find-node.sh
 dfo_find_node "$(pwd)" || exit 1
 
-# Remember an explicit game path for the headless sync and the launcher.
+# Remember an explicit game path for the launcher and the check.
 if [ -n "$APP" ]; then
   printf '%s\n' "$APP" > modloader/app-path.txt
   printf '%s\n' "$APP" > modloader/game-path.txt
@@ -36,12 +36,8 @@ elif [ -f modloader/app-path.txt ]; then
 fi
 if [ -n "$APP" ]; then export DFO_APP="$APP"; fi
 
-echo "[dfo-mods] installing the loader and every mod (node: $NODE)"
-"$NODE" modloader/sync.mjs
-
-echo
-echo "[dfo-mods] removing any background watcher (the launcher replaces it)"
-"$NODE" modloader/install.mjs --remove-watch || true
+echo "[dfo-mods] removing the old background sync, then checking the mods (node: $NODE)"
+"$NODE" modloader/install.mjs
 
 echo
 echo "[dfo-mods] setting up the launcher"
@@ -62,7 +58,7 @@ else
 [Desktop Entry]
 Type=Application
 Name=DFO Online (Mods)
-Comment=Start DFO Online and sync its mods first
+Comment=Start DFO Online with the mods applied
 Exec="$NODE" "$(pwd)/modloader/play.mjs"
 Path=$(pwd)
 Terminal=false
@@ -72,13 +68,6 @@ fi
 echo "launcher: $ENTRY"
 echo "Start the game from 'DFO Online (Mods)' (or $(pwd)/play.sh)."
 
-echo
-echo "[dfo-mods] checking"
-"$NODE" modloader/install.mjs --check
-for dir in */install.mjs; do
-  [ "$dir" = "modloader/install.mjs" ] && continue
-  "$NODE" "$dir" --check || true
-done
 
 echo
-echo "Done. The launcher syncs the mods, then leaves you at the game's Play screen."
+echo "Done. Start the game from the shortcut; the mods are applied as it starts."

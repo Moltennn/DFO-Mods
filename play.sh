@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DFO Online (Mods) - sync the mods, then open the game's launcher.
+# DFO Online (Mods) - start the game with the mods applied.
 # (No background service; this only runs while the shortcut is starting.)
 # Node.js 18+: the system copy, or a portable one in node/bin/node (or DFO_NODE).
 set -euo pipefail

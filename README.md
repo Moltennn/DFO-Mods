@@ -202,8 +202,10 @@ scheme** (Classic / Bright / Colour-blind blue-orange / High contrast), and
 Pack and loot-window rows get the same treatment: the name takes the material
 colour (quest items magenta), the line under it is the card line (`T4 · Steel ·
 Long Blade · 1H`), and an item with two colours (quest + gem, quest + metal)
-fades between them when **Gradient names** is on. Ingredient rows get a small
-glyph by kind (herb, fungus, mineral, flower, animal).
+fades between them when **Gradient names** is on. A stack's count appears once
+in the pack — the game's corner `.count` badge — not also coloured in the name.
+Ingredient rows get a small glyph by kind (herb, fungus, mineral, flower,
+animal), on the world plaque as well as in the pack.
 
 Rows are coloured by material (a dot and the name) in the Classic Daggerfall
 palette or a brighter one; a magic/rare/legendary row keeps the game's rarity

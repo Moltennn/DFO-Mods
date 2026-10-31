@@ -39,7 +39,10 @@ function deferOrDie(msg) { die(msg); }
  * renamed every build (`Gt` at 0.1.13266, `In` at 0.1.13299), so capture it. */
 const ROW_RX = /name:([A-Za-z0-9_$]+)\(e\)\.name\|\|`Something`,stack:/;
 const A_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);';
-const B_TIER = 'r.rarity&&(i.dataset.rarity=r.rarity);r.tier!=null&&(i.dataset.tier=String(r.tier));';
+const TIER_ATTR = 'r.tier!=null&&(i.dataset.tier=String(r.tier));';
+/* the ingredient glyph key rides the row model to the renderer, like the tier */
+const ING_ATTR = 'r.ing!=null&&(i.dataset.dfoIng=r.ing);';
+const B_TIER = A_TIER + TIER_ATTR + ING_ATTR;
 /* the inventory item card's stat list: add our rows right after "Hands" */
 const A_CARD = 'm(`Type`,o.armorType),m(`Hands`,o.hands);';
 /* 0.1.13448 moved the card to a model object (the item is `a.item`) and renamed
@@ -59,7 +62,13 @@ const A_ROWS_FALLBACK = 'function Pf(e,t=-1,n=0,r=6){';
 /* the pack/loot-window row: name + the small meta line, built in the same
  * chunk as the card. Rows are `button.itemrow` with `span.itemname`. */
 const ROW_NAME = 'c.append(W(`span`,null,n.name+(n.stack?` ×${n.stack}`:``)));';
-const ROW_NAME_NEW = 'c.append(W(`span`,null,(globalThis.__dfoUiTweaks?.rowName?.(e,n.name)??n.name)+(n.stack?` ×${n.stack}`:``)));';
+/* A pack row already carries its stack as the corner `.count` badge, so the
+ * name must not repeat " ×N" there (the tier/gem colour made it read as part
+ * of the name). A loot-window row has no badge, so it keeps the count. The
+ * side is the same argument the badge checks against `local`. */
+const ROW_COUNT_RX = /n\.stack&&([A-Za-z0-9_$]+)===`local`&&[A-Za-z0-9_$]+\.append\(`span`,`count`,String\(n\.stack\)\)/;
+const rowNameText = (side) => 'c.append(W(`span`,null,(globalThis.__dfoUiTweaks?.rowName?.(e,n.name)??n.name)+(n.stack&&' + side + '!==`local`?` ×${n.stack}`:``)));';
+const ROW_NAME_OLD_SUFFIX = '+(n.stack?` ×${n.stack}`:``)';
 const ROW_META = 'let l=[n.material,n.word,n.lit?`lit`:null,n.quest==null?null:Fo()].filter(Boolean).join(` · `);';
 const ROW_META_NEW = 'let l=globalThis.__dfoUiTweaks?.cardLine?.(e)||[n.material,n.word,n.lit?`lit`:null,n.quest==null?null:Fo()].filter(Boolean).join(` · `);';
 const ROW_DECOR = 'El(o,e);let s=P===e&&F===t;';
@@ -121,14 +130,22 @@ export function patch(store, log = () => {}) {
       });
       if (!rows) deferOrDie('the plaque row chunk was not found and the bundled build is not readable - start the game, then retry', seed);
       let text = rows.text;
-      if (text.includes(MARKER)) log(`  tier labels already applied (${rows.rel})`);
-      else {
+      const ING_MODEL = 'ing:globalThis.__dfoUiTweaks?.ingredientKind?.(e)??null,';
+      const TIER_MODEL = 'tier:globalThis.__dfoUiTweaks?.lootTier?.(e)??null,';
+      if (!text.includes(MARKER)) {
         const m = text.match(ROW_RX);
         if (!m) die('the plaque row anchor was not found - aborting (nothing written)');
         const nameFn = m[1];
-        const out = `name:globalThis.__dfoUiTweaks?.lootLabel?.(e,${nameFn}(e).name)||${nameFn}(e).name||\`Something\`,tier:globalThis.__dfoUiTweaks?.lootTier?.(e)??null,stack:`;
+        const out = `name:globalThis.__dfoUiTweaks?.lootLabel?.(e,${nameFn}(e).name)||${nameFn}(e).name||\`Something\`,${TIER_MODEL}${ING_MODEL}stack:`;
         text = text.replace(ROW_RX, out);
         log(`  patched ${rows.rel} (plaque rows)`);
+      } else {
+        log(`  tier labels already applied (${rows.rel})`);
+        /* a build patched by an older version of this mod: add the glyph key */
+        if (!text.includes('ingredientKind') && text.includes(`${TIER_MODEL}stack:`)) {
+          text = text.replace(`${TIER_MODEL}stack:`, `${TIER_MODEL}${ING_MODEL}stack:`);
+          log(`  patched ${rows.rel} (ingredient glyph key)`);
+        }
       }
       const hook = ensureRowFilter(text);
       if (hook.missing) die('the plaque row filter anchor was not found - aborting (nothing written)');
@@ -144,24 +161,32 @@ export function patch(store, log = () => {}) {
       }
       store.write(rows.rel, Buffer.from(text));
       checks.push({ rel: rows.rel, has: 'lootLabel' });
+      checks.push({ rel: rows.rel, has: 'ingredientKind' });
       checks.push({ rel: rows.rel, has: 'return null;' });
     }
 
     // ---- 2. the plaque renderer: carry the tier to the DOM ---------------
     {
       const renderer = store.findChunk({
-        test: (t) => t.includes(A_TIER) || t.includes('i.dataset.tier=String(r.tier)'),
+        test: (t) => t.includes(A_TIER) || t.includes(TIER_ATTR),
       });
       if (!renderer) deferOrDie('the plaque renderer chunk was not found and the bundled build is not readable - start the game, then retry', seed);
       let text = renderer.text;
-      if (text.includes('i.dataset.tier=String(r.tier)')) log(`  data-tier already applied (${renderer.rel})`);
-      else {
+      if (text.includes(TIER_ATTR)) {
+        log(`  data-tier already applied (${renderer.rel})`);
+        /* a build patched by an older version of this mod: add the glyph key */
+        if (!text.includes(ING_ATTR)) {
+          text = text.replace(TIER_ATTR, TIER_ATTR + ING_ATTR);
+          log(`  patched ${renderer.rel} (plaque row glyph key)`);
+        }
+      } else {
         if (!text.includes(A_TIER)) die('the plaque renderer anchor was not found - aborting (nothing written)');
         text = text.replace(A_TIER, B_TIER);
         log(`  patched ${renderer.rel} (plaque renderer)`);
       }
       store.write(renderer.rel, Buffer.from(text));
-      checks.push({ rel: renderer.rel, has: 'i.dataset.tier=String(r.tier)' });
+      checks.push({ rel: renderer.rel, has: TIER_ATTR });
+      checks.push({ rel: renderer.rel, has: ING_ATTR });
     }
 
     // ---- 3. the plaque's row framer: how many rows fit ------------------
@@ -226,13 +251,21 @@ export function patch(store, log = () => {}) {
       } else log(`  card meta line already applied (${card.rel})`);
 
       /* the pack and loot-window rows share one builder: label, tag line and colour key */
+      const side = ROW_COUNT_RX.exec(text)?.[1] ?? 't';
       if (!text.includes('rowName?.')) {
         if (!text.includes(ROW_NAME) || !text.includes(ROW_META) || !text.includes(ROW_DECOR)) {
           die('the pack/loot row builder anchor was not found - aborting (nothing written)');
         }
-        text = text.replace(ROW_NAME, ROW_NAME_NEW).replace(ROW_META, ROW_META_NEW).replace(ROW_DECOR, ROW_DECOR_NEW);
+        text = text.replace(ROW_NAME, rowNameText(side)).replace(ROW_META, ROW_META_NEW).replace(ROW_DECOR, ROW_DECOR_NEW);
         log(`  patched ${card.rel} (pack/loot rows)`);
-      } else log(`  pack/loot rows already patched (${card.rel})`);
+      } else {
+        log(`  pack/loot rows already patched (${card.rel})`);
+        /* a build patched by an older version of this mod: drop the repeated count */
+        if (text.includes(ROW_NAME_OLD_SUFFIX)) {
+          text = text.replace(ROW_NAME_OLD_SUFFIX, '+(n.stack&&' + side + '!==`local`?` ×${n.stack}`:``)');
+          log(`  patched ${card.rel} (stack count shown once)`);
+        }
+      }
 
       /* A row's condition word ("New", "Worn") and the generic "quest item"
        * line are noise: drop the condition, and let a quest item show its quest

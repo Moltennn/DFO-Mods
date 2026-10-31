@@ -2,9 +2,10 @@
  * DFO Online - UI Tweaks: readable loot, in the plaque and the item card.
  *
  * Installer hooks (all read-only):
- *   - propBodies-*.js      row label/tier, the shared row-filter hook line,
- *                          and the "empty pile" model guard
- *   - deepWaterRuntime-*.js  data-tier on the row (the style keys off it)
+ *   - propBodies-*.js      row label/tier/glyph, the shared row-filter hook
+ *                          line, and the "empty pile" model guard
+ *   - deepWaterRuntime-*.js  data-tier / data-dfo-ing on the row (the style
+ *                          keys off them)
  *   - enhancedInventory-*.js the card's summary line and its data-dfo-tier
  *
  * Nothing here touches game data: it reads the item object the game already
@@ -129,8 +130,11 @@ const ICON_SVG = {
   flower: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M12 2a3.5 3.5 0 0 1 0 7 3.5 3.5 0 0 1 0-7zm-5 5a3.5 3.5 0 0 1 5 5 3.5 3.5 0 0 1-5-5zm10 0a3.5 3.5 0 0 1 0 7 3.5 3.5 0 0 1 0-7zm-5 5a3.5 3.5 0 0 1 0 7 3.5 3.5 0 0 1 0-7zM11 15h2v8h-2z'/></svg>",
   animal: "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path d='M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6zm12 0a3 3 0 1 1 0 6 3 3 0 0 1 0-6zM3 16c0-3.5 4-6 9-6s9 2.5 9 6-4 6-9 6-9-2.5-9-6z'/></svg>",
 };
-const ICON_RULES = Object.entries(ICON_SVG).map(([kind, svg]) =>
-  `:root.dfo-uitweaks-icons .pack-shell .itemrow[data-dfo-ing="${kind}"] .itemname > span::before{--dfo-icon:url("data:image/svg+xml,${encodeURIComponent(svg)}")}`).join('\n');
+const ICON_RULES = Object.entries(ICON_SVG).map(([kind, svg]) => {
+  const icon = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  return `:root.dfo-uitweaks-icons .pack-shell .itemrow[data-dfo-ing="${kind}"] .itemname > span::before,
+:root.dfo-uitweaks-icons .wplaque-list .wplaque-row[data-dfo-ing="${kind}"] > span:first-child::before{--dfo-icon:${icon}}`;
+}).join('\n');
 const QUEST_HEX = '#f873ff';
 
 /* The Daggerfall material order the game itself ranks by, low to high:
@@ -454,7 +458,7 @@ const ICON_KINDS = [
   ['animal', ['gland', 'venom', 'eye', 'bone', 'blood', 'scale', 'heart', 'tongue', 'claw', 'fang', 'horn', 'silk', 'hair', 'feather', 'wing', 'tusk', 'shell', 'egg', 'skin', 'wrapping', 'bandage', 'web']],
   ['herb', ['leaf', 'root', 'herb', 'weed', 'grass', 'stem', 'bark', 'moss', 'fern', 'bulb']],
 ];
-function ingredientKind(item) {
+export function ingredientKind(item) {
   if (!item || !/Ingredient/i.test(String(item.group ?? ''))) return null;
   const words = norm(item.name);
   for (const [kind, keys] of ICON_KINDS) {
@@ -606,9 +610,12 @@ function tierCss() {
       rules.push(`[data-dfo-t2="gem-${grade}-${stone}"] { --dfo-tier2: ${hex}; }`);
     }
   }
-  /* Ingredient icons, masked so they follow the row colour. */
+  /* Ingredient icons, masked so they follow the row colour. The plaque takes
+   * them too: the row has no tier dot to share the slot with (a quest
+   * ingredient keeps its magenta dot). */
   rules.push(`
-:root.dfo-uitweaks-icons .pack-shell .itemrow[data-dfo-ing] .itemname > span::before {
+:root.dfo-uitweaks-icons .pack-shell .itemrow[data-dfo-ing] .itemname > span::before,
+:root.dfo-uitweaks-icons .wplaque-list .wplaque-row[data-dfo-ing]:not([data-tier]) > span:first-child::before {
   content: ''; display: inline-block; width: 11px; height: 11px; margin-right: 6px;
   vertical-align: -1px; background: currentColor;
   -webkit-mask: var(--dfo-icon) center / contain no-repeat; mask: var(--dfo-icon) center / contain no-repeat;
@@ -823,7 +830,7 @@ export function install() {
   cfg ??= load();
   ensureStyle();
   applyColours();
-  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, cardLine, tierOf: materialSlug, isQuest, rowName, tierTags, decorateRow };
+  globalThis.__dfoUiTweaks = { lootLabel, lootTier, lootRows, itemFacts, cardLine, tierOf: materialSlug, isQuest, rowName, tierTags, decorateRow, ingredientKind };
   watchPlaque();
   liftTimer ??= setInterval(watchPlaque, 400);
 }

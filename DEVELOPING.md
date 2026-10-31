@@ -180,14 +180,19 @@ Patches:
 
 1. `assets/propBodies-*.js` — the plaque's item-row builder calls
    `__dfoUiTweaks.lootLabel(item, name)` for each row's label and carries the
-   tier through; the generic `__dfoRowFilter.keep(item)` hook (shared with Loot
-   Filter); the row framer takes its row count from `lootRows()`; the item-model
-   builders return null when the filter removed every row of a non-empty pile.
+   tier and the ingredient glyph key (`ing`) through; the generic
+   `__dfoRowFilter.keep(item)` hook (shared with Loot Filter); the row framer
+   takes its row count from `lootRows()`; the item-model builders return null
+   when the filter removed every row of a non-empty pile.
 2. `assets/deepWaterRuntime-*.js` — the plaque renderer copies `tier` onto the
-   row as `data-tier`.
+   row as `data-tier` and `ing` as `data-dfo-ing` (the ingredient glyph).
 3. `assets/enhancedInventory-*.js` — the card's line under the name asks
    `__dfoUiTweaks.cardLine(item)`, its stat list asks `itemFacts(item)`, and the
-   card gets `data-dfo-tier`.
+   card gets `data-dfo-tier`. The pack/loot-window rows ask `rowName(item, name)`,
+   `cardLine(item)` for the tag line and `decorateRow(row, item)` for the colour
+   keys; a pack row's name drops the game's ` ×N`, since the row's corner
+   `.count` badge already shows the stack (that repeated count took the tier/gem
+   colour). A loot-window row has no badge and keeps it.
 4. `assets/dfo-uitweaks.js` — the mod.
 
 Label internals:

@@ -451,7 +451,7 @@ const ICON_KINDS = [
   ['fungus', ['mushroom', 'toadstool', 'fungus', 'spore', 'mold', 'mould', 'lichen', 'truffle']],
   ['mineral', ['salt', 'crystal', 'ore', 'stone', 'dust', 'powder', 'resin', 'amber']],
   ['flower', ['flower', 'blossom', 'petal', 'rose', 'lily', 'orchid']],
-  ['animal', ['gland', 'venom', 'eye', 'bone', 'blood', 'scale', 'heart', 'tongue', 'claw', 'fang', 'horn', 'silk']],
+  ['animal', ['gland', 'venom', 'eye', 'bone', 'blood', 'scale', 'heart', 'tongue', 'claw', 'fang', 'horn', 'silk', 'hair', 'feather', 'wing', 'tusk', 'shell', 'egg', 'skin', 'wrapping', 'bandage', 'web']],
   ['herb', ['leaf', 'root', 'herb', 'weed', 'grass', 'stem', 'bark', 'moss', 'fern', 'bulb']],
 ];
 function ingredientKind(item) {

@@ -97,6 +97,26 @@ if (!app) {
 }
 try { fs.writeFileSync(GAME_FILE, `${app}\n`); } catch { /* read-only workspace */ }
 
+/* One wrapper per folder: a second press of the shortcut takes over from the
+ * first (its server is replaced), so two servers can never answer one game. */
+const LOCK = path.join(MODLOADER_ROOT, 'play.pid');
+const alive = (pid) => {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+};
+try {
+  const pid = Number(fs.readFileSync(LOCK, 'utf8').trim());
+  if (pid && pid !== process.pid && alive(pid)) {
+    say(`replacing the earlier launcher (pid ${pid})`);
+    try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
+    for (let i = 0; i < 10 && alive(pid); i++) await sleep(200);
+  }
+} catch { /* no earlier wrapper */ }
+try { fs.writeFileSync(LOCK, `${process.pid}\n`); } catch { /* read-only workspace */ }
+const dropLock = () => { try { if (Number(fs.readFileSync(LOCK, 'utf8').trim()) === process.pid) fs.rmSync(LOCK, { force: true }); } catch { /* gone */ } };
+process.on('exit', dropLock);
+process.on('SIGTERM', () => { dropLock(); process.exit(0); });
+process.on('SIGINT', () => { dropLock(); process.exit(0); });
+
 // A game started a moment ago (the shortcut was pressed twice, or it is still
 // loading) is not a reason to refuse: wait for it to settle, then check again.
 for (let i = 0; i < 20 && runningAppAsars().length > 0; i++) {

@@ -37,29 +37,58 @@ const MIME = {
 };
 const mimeOf = (rel) => MIME[path.extname(rel).toLowerCase()] || 'application/octet-stream';
 
-/** The patched build, rebuilt when the store's state changes (a channel update). */
+/**
+ * The patched build, rebuilt when the store's state changes (a channel update).
+ *
+ * A session is PINNED to the build its page loaded from: pages name their chunks
+ * (`weaponRig-ip_E-Xp2.js`), and a new build has different names - switching the
+ * view under an open page would 404 the game's own imports. So a request for the
+ * game's entry page pins the current build, and everything after it answers from
+ * that build. A file the pinned build does not have is read from the newest build
+ * (or the seed), so a chunk load that starts after an update still resolves.
+ */
 function buildCache({ app, log }) {
   let key = null;
   let pending = null;
+  let pinned = null;
+  let pinnedKey = null;
   const stateKey = () => {
     try { const st = fs.statSync(path.join(ROOT, 'state.json')); return `${st.mtimeMs}:${st.size}`; } catch { return 'none'; }
   };
-  return function get() {
-    const k = stateKey();
-    if (pending && key === k) return pending;
-    key = k;
-    pending = (async () => {
-      const build = openBuild({ app });
-      if (build.error) throw new Error(build.error);
-      const view = viewOf(build);
-      const mods = await discoverMods();
-      const out = runPatches(view, mods, log);
-      log(`build v${build.version}: ${out.registry.length} mod${out.registry.length === 1 ? '' : 's'} applied`
-        + (out.failed.length ? `, ${out.failed.length} not applied` : ''));
-      return { version: build.version, view, registry: out.registry, failed: out.failed };
-    })();
-    pending.catch(() => { if (key === k) { key = null; pending = null; } });
-    return pending;
+  async function buildNow(k) {
+    const build = openBuild({ app });
+    if (build.error) throw new Error(build.error);
+    const view = viewOf(build);
+    const mods = await discoverMods();
+    const out = runPatches(view, mods, log);
+    log(`build v${build.version}: ${out.registry.length} mod${out.registry.length === 1 ? '' : 's'} applied`
+      + (out.failed.length ? `, ${out.failed.length} not applied` : ''));
+    return { key: k, version: build.version, view, registry: out.registry, failed: out.failed };
+  }
+  return {
+    /** The newest build (what the store plays now). */
+    current() {
+      const k = stateKey();
+      if (pending && key === k) return pending;
+      key = k;
+      pending = buildNow(k);
+      pending.catch(() => { if (key === k) { key = null; pending = null; } });
+      return pending;
+    },
+    /** The build this session answered from: pinned at its entry page. */
+    pinned() {
+      if (pinned && pinnedKey === key) return pinned;
+      pinned = null;
+      return null;
+    },
+    async pin() {
+      const k = stateKey();
+      if (pinned && pinnedKey === k) return pinned;
+      pinned = await this.current();
+      pinnedKey = k;
+      log(`session pinned to v${pinned.version}`);
+      return pinned;
+    },
   };
 }
 
@@ -103,16 +132,32 @@ async function respond(req, res, get) {
     return body ? send(res, 200, 'application/octet-stream', body) : send(res, 404, 'text/plain');
   }
 
+  if (rel === '') rel = GAME_ENTRY;
   let build;
-  try { build = await get(); } catch (e) { return send(res, 503, 'text/plain', `the build is not readable yet: ${e.message}`); }
+  try {
+    // the game's own page starts a session: pin the build it loads from
+    build = rel === GAME_ENTRY ? await get.pin() : (get.pinned() ?? await get.current());
+  } catch (e) {
+    return send(res, 503, 'text/plain', `the build is not readable yet: ${e.message}`);
+  }
   if (rel === REGISTRY_REL) return send(res, 200, MIME['.js'], renderRegistry(build.registry));
 
-  if (rel === '') rel = GAME_ENTRY;
   let hit = build.view.read(rel);
   if (!hit) {
     const index = `${rel}/index.html`;
     const alt = build.view.read(index);
     if (alt) { hit = alt; rel = index; }
+  }
+  if (!hit && build !== (get.pinned() ?? build)) {
+    // a chunk the page asks for that the pinned build does not have: the newest
+    // build's copy is still a file of the game
+    try {
+      const fresh = await get.current();
+      if (fresh !== build) {
+        hit = fresh.view.read(rel);
+        if (hit) log(`${rel} is not in v${build.version} - served from v${fresh.version}`);
+      }
+    } catch { /* leave the 404 */ }
   }
   if (!hit) return send(res, 404, 'text/plain');
   const body = rel === GAME_ENTRY ? injectTag(hit.bytes) : hit.bytes;

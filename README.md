@@ -1,3 +1,4 @@
+[Español](README.es.md)
 # DFO Online Mods
 
 Client-side mods for **DFO Online** (the desktop build), plus the shared loader

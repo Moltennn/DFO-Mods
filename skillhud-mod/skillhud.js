@@ -47,7 +47,11 @@ const SKILL_NAMES = [
 ];
 const PICKABLE = SKILL_NAMES
   .map((n, i) => [i, n])
-  .filter(([i, n]) => !/^(Orcish|Harpy|Giantish|Dragonish|Nymph|Daedric|Spriggan|Centaurian|Impish)$/.test(n));
+  .filter(([i, n]) => !/^(Orcish|Harpy|Giantish|Dragonish|Nymph|Daedric|Spriggan|Centaurian|Impish)$/.test(n))
+  .sort(([a, an], [b, bn]) => an.localeCompare(bn));
+/** Skills read alphabetically in the panel and the checklist, not in the
+ *  game's school order. */
+const bySkillName = (a, b) => SKILL_NAMES[a].localeCompare(SKILL_NAMES[b]);
 const QI = [12, 1, 1, 5, 15, 15, 15, 15, 15, 15, 15, 15, 15, 2, 1, 2, 2, 1, 2, 1, 4, 50, 1, 2, 1, 1, 2, 1, 2, 2, 2, 2, 2, 1, 8];
 const SOFT_CAP_MILESTONES = [[125, 2], [150, 3], [175, 4], [200, 6]];
 const STORE_KEY = 'dfoLevelTracker.config.v2';
@@ -510,7 +514,7 @@ function render() {
   if (rowGapCache !== cfg.rowGap) { rowGapCache = cfg.rowGap; el.style.setProperty('--lt-rowgap', cfg.rowGap + 'px'); }
   el.classList.toggle('lt-no-levels', cfg.skillLevels === false);
   const e = entity();
-  renderer(listEl, e, e ? cfg.tracked.slice().sort((a, b) => a - b) : []);
+  renderer(listEl, e, e ? cfg.tracked.slice().sort(bySkillName) : []);
 }
 
 // -------------------------------------------------------- config pane

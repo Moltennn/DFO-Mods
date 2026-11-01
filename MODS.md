@@ -32,9 +32,10 @@ Skills**). The optional **Skill levels** column on the right uses the game's own
 skill text (`32`, or `100 (104)` when a softcap is holding it down).
 
 The panel has no title line; the game's Alt+U layout editor names it “Skill
-tracker”. It follows the game's HUD colours and the active theme. Moving,
-scaling, hiding and placing it are the game's own HUD editor; the mod's pane has
-**Show/Hide panel** and **Reset panel placement**.
+tracker”. Skills are listed alphabetically. It follows the game's HUD colours
+and the active theme. Moving, scaling, hiding and placing it are the game's own
+HUD editor; the mod's pane has **Show/Hide panel** and **Reset panel
+placement**.
 
 **ESC → Mods → Skill Tracker**: panel opacity, **Skill levels**, row spacing,
 **Show/Hide panel**, reset placement, and the checklist of tracked skills.

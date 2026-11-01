@@ -91,14 +91,20 @@ const BATCHLIST_RX = /for\(let ([A-Za-z0-9_$]+) of ([A-Za-z0-9_$]+)\)\1\.castOnl
 /* The row builder's item name is the one stable shape (`name:<fn>(e).name||
  * `Something``); the helper is renamed every build. */
 const ROW_RX = /name:([A-Za-z0-9_$]+)\(e\)\.name\|\|`Something`,stack:/;
-const A_FILTER = ',item:e})),r=n.slice(0,t)';
+/* the list is sliced with the builder's own names (`r=n.slice(0,t)` today) */
+const ROW_FILTER_RX = /,item:e\}\)\),([A-Za-z0-9_$]+)=([A-Za-z0-9_$]+)\.slice\(0,([A-Za-z0-9_$]+)\)/;
 const ROW_HOOK = 'globalThis.__dfoRowFilter?.keep?.(e.item)??true';
 const OLD_HOOK_RX = /\.filter\(e=>globalThis\.__dfoUiTweaks\?\.keepLoot\?\.\(e\.item\)\?\?true\)/;
 
 function ensureRowFilter(text) {
   if (text.includes(ROW_HOOK)) return { text, changed: false };
   if (OLD_HOOK_RX.test(text)) return { text: text.replace(OLD_HOOK_RX, `.filter(e=>${ROW_HOOK})`), changed: true };
-  if (text.includes(A_FILTER)) return { text: text.replace(A_FILTER, `,item:e})).filter(e=>${ROW_HOOK}),r=n.slice(0,t)`), changed: true };
+  if (ROW_FILTER_RX.test(text)) {
+    return {
+      text: text.replace(ROW_FILTER_RX, (all, out, list, limit) => `,item:e})).filter(e=>${ROW_HOOK}),${out}=${list}.slice(0,${limit})`),
+      changed: true,
+    };
+  }
   return { text, changed: false, missing: true };
 }
 

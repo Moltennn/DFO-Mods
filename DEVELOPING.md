@@ -192,7 +192,10 @@ Patches:
    `cardLine(item)` for the tag line and `decorateRow(row, item)` for the colour
    keys; a pack row's name drops the game's ` ×N`, since the row's corner
    `.count` badge already shows the stack (that repeated count took the tier/gem
-   colour). A loot-window row has no badge and keeps it.
+   colour). A loot-window row has no badge and keeps it. The row builder's
+   identifiers (create-element helper, decorator, selection pair) are minifier
+   output and are captured from the row itself rather than hardcoded - they were
+   `W`/`El`/`P`+`F` up to 0.1.13999 and `H`/`Xl`/`M`+`N` at 0.1.14461.
 4. `assets/dfo-uitweaks.js` — the mod.
 
 Label internals:

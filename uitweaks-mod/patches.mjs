@@ -59,22 +59,21 @@ const B_FACTS = 'if(typeof globalThis<`u`&&globalThis.__dfoUiTweaks?.itemFacts){
 const B_CARD = A_CARD + B_FACTS;
 
 const A_ROWS_FALLBACK = 'function Pf(e,t=-1,n=0,r=6){';
-/* the pack/loot-window row: name + the small meta line, built in the same
- * chunk as the card. Rows are `button.itemrow` with `span.itemname`. */
-const ROW_NAME = 'c.append(W(`span`,null,n.name+(n.stack?` ×${n.stack}`:``)));';
+/* The pack/loot-window row builder (in the same chunk as the card): rows are
+ * `button.itemrow` with `span.itemname`. Every identifier in it is minifier
+ * output - the create-element helper, the decorator and the selection pair were
+ * `W`/`El`/`P`+`F` at 0.1.13940 and `H`/`Xl`/`M`+`N` at 0.1.14461 - so capture
+ * the whole run by its shape and rebuild it with the names this build uses. */
+const ROW_CORE_RX = /([A-Za-z0-9_$]+)\.append\(([A-Za-z0-9_$]+)\(`span`,`count`,String\(n\.stack\)\)\);let ([A-Za-z0-9_$]+)=\2\(`span`,`itemname`\);\3\.append\(\2\(`span`,null,n\.name\+\(n\.stack\?` ×\$\{n\.stack\}`:``\)\)\);let ([A-Za-z0-9_$]+)=\[n\.material,n\.word,n\.lit\?`lit`:null,n\.quest==null\?null:([A-Za-z0-9_$]+)\(\)\]\.filter\(Boolean\)\.join\(` · `\);/;
 /* A pack row already carries its stack as the corner `.count` badge, so the
  * name must not repeat " ×N" there (the tier/gem colour made it read as part
  * of the name). A loot-window row has no badge, so it keeps the count. The
- * side is the same argument the badge checks against `local`. */
-const ROW_COUNT_RX = /n\.stack&&([A-Za-z0-9_$]+)===`local`&&[A-Za-z0-9_$]+\.append\(`span`,`count`,String\(n\.stack\)\)/;
-const rowNameText = (side) => 'c.append(W(`span`,null,(globalThis.__dfoUiTweaks?.rowName?.(e,n.name)??n.name)+(n.stack&&' + side + '!==`local`?` ×${n.stack}`:``)));';
+ * side is the argument the badge checks against `local`. */
+const ROW_COUNT_RX = /n\.stack&&([A-Za-z0-9_$]+)===`local`&&([A-Za-z0-9_$]+)\.append\(([A-Za-z0-9_$]+)\(`span`,`count`,String\(n\.stack\)\)\)/;
 const ROW_NAME_OLD_SUFFIX = '+(n.stack?` ×${n.stack}`:``)';
-const ROW_META = 'let l=[n.material,n.word,n.lit?`lit`:null,n.quest==null?null:Fo()].filter(Boolean).join(` · `);';
-const ROW_META_NEW = 'let l=globalThis.__dfoUiTweaks?.cardLine?.(e)||[n.material,n.word,n.lit?`lit`:null,n.quest==null?null:Fo()].filter(Boolean).join(` · `);';
-const ROW_DECOR = 'El(o,e);let s=P===e&&F===t;';
-const ROW_DECOR_NEW = 'El(o,e),globalThis.__dfoUiTweaks?.decorateRow?.(o,e);let s=P===e&&F===t;';
 const ROWS_RX = /function ([A-Za-z0-9_$]+)\(e,t=-1,n=0,r=6\)\{let i=e\?\.rows\?\.length\?\?0;if\(!e\|\|e\.kind!==`items`/;
-const A_FILTER = ',item:e})),r=n.slice(0,t)';
+/* the row list is sliced by the builder's own parameter names; capture them */
+const ROW_FILTER_RX = /,item:e\}\)\),([A-Za-z0-9_$]+)=([A-Za-z0-9_$]+)\.slice\(0,([A-Za-z0-9_$]+)\)/;
 /* the loot filter is its own mod; the row builder calls this generic hook so
  * either installer can provide it and the other's patches survive */
 const ROW_HOOK = 'globalThis.__dfoRowFilter?.keep?.(e.item)??true';
@@ -113,7 +112,12 @@ function guardEmptyPiles(text) {
 function ensureRowFilter(text) {
   if (text.includes(ROW_HOOK)) return { text, changed: false };
   if (OLD_HOOK_RX.test(text)) return { text: text.replace(OLD_HOOK_RX, `.filter(e=>${ROW_HOOK})`), changed: true };
-  if (text.includes(A_FILTER)) return { text: text.replace(A_FILTER, `,item:e})).filter(e=>${ROW_HOOK}),r=n.slice(0,t)`), changed: true };
+  if (ROW_FILTER_RX.test(text)) {
+    return {
+      text: text.replace(ROW_FILTER_RX, (all, out, list, limit) => `,item:e})).filter(e=>${ROW_HOOK}),${out}=${list}.slice(0,${limit})`),
+      changed: true,
+    };
+  }
   return { text, changed: false, missing: true };
 }
 
@@ -250,18 +254,32 @@ export function patch(store, log = () => {}) {
         }
       } else log(`  card meta line already applied (${card.rel})`);
 
-      /* the pack and loot-window rows share one builder: label, tag line and colour key */
-      const side = ROW_COUNT_RX.exec(text)?.[1] ?? 't';
+      /* the pack and loot-window rows share one builder: label, tag line and
+       * colour key. The identifiers are this build's own (captured below). */
       if (!text.includes('rowName?.')) {
-        if (!text.includes(ROW_NAME) || !text.includes(ROW_META) || !text.includes(ROW_DECOR)) {
-          die('the pack/loot row builder anchor was not found - aborting (nothing written)');
-        }
-        text = text.replace(ROW_NAME, rowNameText(side)).replace(ROW_META, ROW_META_NEW).replace(ROW_DECOR, ROW_DECOR_NEW);
+        const core = ROW_CORE_RX.exec(text);
+        if (!core) die('the pack/loot row builder anchor was not found - aborting (nothing written)');
+        const [, rowVar, el, nameVar, metaVar] = core;
+        const side = ROW_COUNT_RX.exec(text)?.[1];
+        if (!side) die('the pack/loot row stack badge was not found - aborting (nothing written)');
+        const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const decorRx = new RegExp(`([A-Za-z0-9_$]+)\\(${esc(rowVar)},e\\);let ([A-Za-z0-9_$]+)=([A-Za-z0-9_$]+)===e&&([A-Za-z0-9_$]+)===t;`);
+        const decor = decorRx.exec(text);
+        if (!decor) die('the pack/loot row decorator anchor was not found - aborting (nothing written)');
+
+        const nameLine = `${nameVar}.append(${el}(\`span\`,null,(globalThis.__dfoUiTweaks?.rowName?.(e,n.name)??n.name)+(n.stack&&${side}!==\`local\`?\` ×\${n.stack}\`:\`\`)));`;
+        const metaLine = `${metaVar}=globalThis.__dfoUiTweaks?.cardLine?.(e)||[n.material,n.lit?\`lit\`:null,n.quest==null?null:(n.quest||\`Quest\`)].filter(Boolean).join(\` · \`);`;
+        const rebuilt = `${rowVar}.append(${el}(\`span\`,\`count\`,String(n.stack)));`
+          + `let ${nameVar}=${el}(\`span\`,\`itemname\`);${nameLine}`
+          + `let ${metaLine}`;
+        text = text.replace(core[0], () => rebuilt);
+        text = text.replace(decor[0], () => `${decor[1]}(${rowVar},e),globalThis.__dfoUiTweaks?.decorateRow?.(${rowVar},e);let ${decor[2]}=${decor[3]}===e&&${decor[4]}===t;`);
         log(`  patched ${card.rel} (pack/loot rows)`);
       } else {
         log(`  pack/loot rows already patched (${card.rel})`);
         /* a build patched by an older version of this mod: drop the repeated count */
-        if (text.includes(ROW_NAME_OLD_SUFFIX)) {
+        const side = ROW_COUNT_RX.exec(text)?.[1];
+        if (side && text.includes(ROW_NAME_OLD_SUFFIX)) {
           text = text.replace(ROW_NAME_OLD_SUFFIX, '+(n.stack&&' + side + '!==`local`?` ×${n.stack}`:``)');
           log(`  patched ${card.rel} (stack count shown once)`);
         }

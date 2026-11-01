@@ -3,11 +3,14 @@
  * DFO Online (Mods) - start the game with the mods applied.
  *
  *   node modloader/play.mjs [--app=<AppImage | exe | .app | app folder>] [-- game arguments]
+ *   node modloader/play.mjs --serve-only      (start the game yourself)
+ *   node modloader/play.mjs --force           (start even if one is detected)
  *
  * Starts a server on 127.0.0.1 (lib/serve.mjs) that serves the game's files with
  * the mods applied, then starts the launcher with DAGGER_DEV_URL pointing at it.
  * The wrapper stays up while the game runs and stops the server when it closes.
- * Nothing in the game store is written.
+ * Nothing in the game store is written. `--serve-only` skips the launcher
+ * entirely (no process probe, no spawn) and prints how to start it by hand.
  *
  * The resolved game path is remembered in modloader/game-path.txt (local only).
  */
@@ -25,6 +28,9 @@ const APP_ARG = (argv.find((a) => a.startsWith('--app=')) || '').slice('--app='.
   || process.env.DFO_GAME || null;
 const GAME_ARGS = argv.includes('--') ? argv.slice(argv.indexOf('--') + 1) : [];
 const GAME_FILE = path.join(MODLOADER_ROOT, 'game-path.txt');
+/* fallbacks for a launcher that will not start (or a wrong "already running") */
+const SERVE_ONLY = argv.includes('--serve-only');
+const FORCE = argv.includes('--force');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const say = (msg) => console.log(`[dfo-mods] ${msg}`);
 
@@ -88,14 +94,35 @@ function programOf(app) {
   return bin ? path.join(dir, bin) : app;
 }
 
+/** How to start the game by hand, pointed at `url` (the fallback path). */
+function manualLaunch(url, app) {
+  const program = app ? programOf(app) : null;
+  const out = [`start the game yourself with DAGGER_DEV_URL set to the server:`];
+  if (process.platform === 'win32') {
+    const exe = program ? `"${program}"` : '"C:\\Program Files\\DFO Online\\DFO Online.exe"';
+    out.push(`  cmd:         set DAGGER_DEV_URL=${url} && start "" ${exe}`);
+    out.push(`  PowerShell:  $env:DAGGER_DEV_URL="${url}"; Start-Process ${exe}`);
+    out.push(`  shortcut:    set DAGGER_DEV_URL for the session, then start the game normally`);
+  } else if (process.platform === 'darwin') {
+    out.push(`  DAGGER_DEV_URL=${url} open "${app ?? '/Applications/DFO Online.app'}"`);
+  } else {
+    out.push(`  DAGGER_DEV_URL=${url} "${program ?? '/path/to/DFO-Online.AppImage'}"`);
+  }
+  out.push('keep this window open while playing; Ctrl+C stops the server');
+  return out.join('\n');
+}
+
 /* ------------------------------------------------------------------- main */
 const app = findLauncher();
-if (!app) {
+if (!app && !SERVE_ONLY) {
   console.error('[dfo-mods] could not find the game. Pass it once:');
   console.error('  node modloader/play.mjs --app="/path/to/DFO Online"');
+  console.error('  (or run with --serve-only and start it by hand)');
   process.exit(1);
 }
-try { fs.writeFileSync(GAME_FILE, `${app}\n`); } catch { /* read-only workspace */ }
+if (app) {
+  try { fs.writeFileSync(GAME_FILE, `${app}\n`); } catch { /* read-only workspace */ }
+}
 
 /* One wrapper per folder: a second press of the shortcut takes over from the
  * first (its server is replaced), so two servers can never answer one game. */
@@ -119,37 +146,51 @@ process.on('SIGINT', () => { dropLock(); process.exit(0); });
 
 // A game started a moment ago (the shortcut was pressed twice, or it is still
 // loading) is not a reason to refuse: wait for it to settle, then check again.
-let runningNow = runningAppAsars();
-for (let i = 0; i < 20 && runningNow.length > 0; i++) {
-  if (i === 0) say(`the game is already running (${runningNow.join(', ')}) - waiting for it to close`);
-  await sleep(1000);
-  runningNow = runningAppAsars();
-}
-if (runningNow.length > 0) {
-  console.error(`[dfo-mods] the game is still running (${runningNow.join(', ')}). Close it, then start again - it must start through this launcher to get the mods.`);
-  process.exit(1);
+// --serve-only never probes (the user starts the game), --force skips the wait.
+if (!SERVE_ONLY) {
+  let runningNow = runningAppAsars();
+  if (FORCE && runningNow.length) {
+    say(`--force: starting anyway (a game is detected: ${runningNow.join(', ')})`);
+  }
+  for (let i = 0; !FORCE && i < 20 && runningNow.length > 0; i++) {
+    if (i === 0) say(`the game is already running (${runningNow.join(', ')}) - waiting for it to close`);
+    await sleep(1000);
+    runningNow = runningAppAsars();
+  }
+  if (!FORCE && runningNow.length > 0) {
+    console.error(`[dfo-mods] the game is still running (${runningNow.join(', ')}). Close it, then start again - it must start through this launcher to get the mods.`);
+    console.error('[dfo-mods] if it is not really running, start anyway with --force, or serve and start the game yourself with --serve-only.');
+    process.exit(1);
+  }
 }
 
 const server = await startServer({ app, log: say });
 say(`serving the game at ${server.url}`);
 
-const program = programOf(app);
-const env = { ...process.env, DAGGER_DEV_URL: server.url };
-if (!/\.AppImage$/i.test(program)) env.APPDIR = path.dirname(program);
-const child = spawn(program, GAME_ARGS, { cwd: path.dirname(app), env, stdio: 'ignore' });
-say(`starting ${path.basename(app)}`);
+if (SERVE_ONLY) {
+  say(manualLaunch(server.url, app));
+  /* the server keeps the process alive; SIGINT/SIGTERM above close it */
+} else {
+  const program = programOf(app);
+  const env = { ...process.env, DAGGER_DEV_URL: server.url };
+  if (!/\.AppImage$/i.test(program)) env.APPDIR = path.dirname(program);
+  const child = spawn(program, GAME_ARGS, { cwd: path.dirname(app), env, stdio: 'ignore' });
+  say(`starting ${path.basename(app)}`);
 
-child.on('error', (e) => {
-  console.error(`[dfo-mods] could not start ${program}: ${e.message}`);
-  server.close();
-  process.exit(1);
-});
+  child.on('error', (e) => {
+    /* the launcher would not start: stay serving and hand the user the manual
+     * command, so the mods still load (the server is what carries them) */
+    console.error(`[dfo-mods] could not start ${program}: ${e.message}`);
+    console.error(`[dfo-mods] ${manualLaunch(server.url, app).replace(/\n/g, '\n[dfo-mods] ')}`);
+    say('staying up for a manual start; Ctrl+C to stop');
+  });
 
-child.on('exit', async (code) => {
-  // The launcher can restart itself (an update); keep serving while a game is up.
-  await sleep(3000);
-  while (runningAppAsars().length > 0) await sleep(2000);
-  say(`the game closed (${code ?? 'signal'})`);
-  server.close();
-  process.exit(0);
-});
+  child.on('exit', async (code) => {
+    // The launcher can restart itself (an update); keep serving while a game is up.
+    await sleep(3000);
+    while (runningAppAsars().length > 0) await sleep(2000);
+    say(`the game closed (${code ?? 'signal'})`);
+    server.close();
+    process.exit(0);
+  });
+}

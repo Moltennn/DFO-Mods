@@ -99,6 +99,32 @@ node modloader/play.mjs --app="/path/to/DFO Online.AppImage"
 node modloader/play.mjs --app="C:\Program Files\DFO Online\DFO Online.exe"
 ```
 
+### If it will not start
+
+Two opt-in fallbacks; the normal shortcut is unchanged.
+
+- `--force` starts the game even when the running-game check reports one. Use
+  it when that report is wrong (it names the `app.asar` it found - another
+  Electron app used to trip it, and a real instance still holds the game's
+  single-instance lock and will simply exit).
+- `--serve-only` starts no game at all: it serves the patched build and prints
+  the command to start the game yourself, with `DAGGER_DEV_URL` set:
+
+  ```bat
+  rem Windows (cmd)
+  set DAGGER_DEV_URL=http://127.0.0.1:47831/play/index.html && start "" "C:\Program Files\DFO Online\DFO Online.exe"
+  ```
+
+  ```bash
+  # Linux
+  DAGGER_DEV_URL=http://127.0.0.1:47831/play/index.html ./DFO-Online-linux-x86_64.AppImage
+  ```
+
+  Keep the window open while playing (`Ctrl+C` stops the server). This avoids
+  the launcher probe, spawn errors and shortcut problems entirely; the mods
+  come from the server either way. If the launcher itself will not start, the
+  wrapper now stays serving and prints this same command automatically.
+
 ### What this changes
 
 - **Rollback is off for modded play.** The launcher normally falls back to the
@@ -274,7 +300,9 @@ turns the old switches into rules, so nothing is lost. The old
 - “the game is already running”: only the game's own `app.asar` counts (it names
   the file it found), so another Electron app - VS Code, Discord - or a portable
   `node.exe` sitting beside the game no longer trips it. If it does name a DFO
-  path, that instance is really up: close it and start through the shortcut.
+  path, that instance is really up: close it and start through the shortcut, or
+  start anyway with `--force`. If the shortcut will not start the game at all,
+  `--serve-only` prints a command that starts it by hand against the server.
 - In game, **ESC → Mods → Reload** re-reads the mod files; it does not need a
   page reload.
 

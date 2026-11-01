@@ -185,6 +185,28 @@ export function openAsar(file) {
 }
 
 /* ------------------------------------------------------------- seed sources */
+/** The game's own package identity: another Electron app (VS Code, Discord...)
+ *  also has `resources/app.asar`, and on Windows it is *every* running Electron
+ *  process that the process list exposes - so a bare "app.asar exists" check
+ *  called the game running whenever any of them was open. */
+const GAME_PKG_NAME = 'daggerfall-js-app';
+export function isGameAsar(file) {
+  let asar;
+  try { asar = openAsar(file); } catch { return false; }
+  try {
+    const pkg = readJsonBuffer(asar.read('package.json'));
+    if (pkg) {
+      if (pkg.name === GAME_PKG_NAME) return true;
+      if (/dfo online|daggerfall/i.test(String(pkg.productName ?? ''))) return true;
+    }
+    /* a rebranded shell still ships the game's seed manifest */
+    const seed = readJsonBuffer(asar.read('game-seed.json'));
+    return !!seed && seed.channel === GAME_CHANNEL && typeof seed.version === 'string';
+  } catch { return false; } finally {
+    try { asar.close(); } catch { /* already closed */ }
+  }
+}
+
 /**
  * A seed source answers, for paths relative to the build root (the `dist/`:
  * 'play/index.html', 'assets/worldTick-….js'):
@@ -278,7 +300,7 @@ export function runningAppAsars(tmpdirs = [...new Set([process.env.TMPDIR, os.tm
     }
     for (const m of mounts) {
       const file = path.join(m, 'resources', 'app.asar');
-      if (fs.existsSync(file)) out.add(file);
+      if (fs.existsSync(file) && isGameAsar(file)) out.add(file);
     }
   }
 
@@ -287,7 +309,10 @@ export function runningAppAsars(tmpdirs = [...new Set([process.env.TMPDIR, os.tm
     const r = spawnSync('ps', ['-axo', 'command='], { encoding: 'utf8', timeout: 4000, maxBuffer: 8 * 1024 * 1024 });
     for (const line of String(r.stdout || '').split('\n')) {
       const m = /^(.+?\.app)\/Contents\/MacOS\//.exec(line.trim());
-      if (m) out.add(path.join(m[1], 'Contents', 'Resources', 'app.asar'));
+      if (m) {
+        const file = path.join(m[1], 'Contents', 'Resources', 'app.asar');
+        if (isGameAsar(file)) out.add(file);
+      }
     }
   }
 
@@ -304,8 +329,11 @@ export function runningAppAsars(tmpdirs = [...new Set([process.env.TMPDIR, os.tm
       for (const line of String(r.stdout).split(/\r?\n/)) {
         const exe = line.trim();
         if (!exe || exe === 'ExecutablePath') continue;
+        /* node.exe/powershell.exe can sit beside the game (a portable Node in
+         * the install folder) and are not the game; the game is an Electron app */
+        if (/(^|[\\/])(node|powershell|pwsh|wmic|cmd|conhost)\.exe$/i.test(exe)) continue;
         const file = path.join(path.dirname(exe), 'resources', 'app.asar');
-        if (fs.existsSync(file)) out.add(file);
+        if (fs.existsSync(file) && isGameAsar(file)) out.add(file);
       }
       if (out.size) break;
     }
@@ -318,7 +346,7 @@ export function runningAppAsars(tmpdirs = [...new Set([process.env.TMPDIR, os.tm
 export function installedAppAsars() {
   const home = os.homedir();
   const out = [];
-  const add = (p) => out.push(...asarFromPath(p));
+  const add = (p) => { for (const f of asarFromPath(p)) if (isGameAsar(f)) out.push(f); };
   if (process.platform === 'darwin') {
     add('/Applications/DFO Online.app');
     add(path.join(home, 'Applications', 'DFO Online.app'));

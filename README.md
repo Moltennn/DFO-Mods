@@ -271,7 +271,10 @@ turns the old switches into rules, so nothing is lost. The old
 - “the build is not readable yet” (the game page shows it): start the game once
   and reload. The Linux AppImage needs its mount; the Windows portable needs its
   unpacked folder. Or pass `--app=`.
-- “the game is already running”: close it and start through the shortcut.
+- “the game is already running”: only the game's own `app.asar` counts (it names
+  the file it found), so another Electron app - VS Code, Discord - or a portable
+  `node.exe` sitting beside the game no longer trips it. If it does name a DFO
+  path, that instance is really up: close it and start through the shortcut.
 - In game, **ESC → Mods → Reload** re-reads the mod files; it does not need a
   page reload.
 

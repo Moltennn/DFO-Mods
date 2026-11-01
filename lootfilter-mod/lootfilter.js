@@ -439,6 +439,15 @@ let paneRoot = null;
 
 const CONTROL_CSS = 'background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:1px 4px';
 const BUTTON_CSS = 'cursor:pointer;background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:2px 8px';
+/* One grid for a rule box: the number gutter (and so every control below it)
+ * starts at the same x, rows share one gap, and the small buttons are one size
+ * whatever the glyph is. */
+const ROW_GAP = 6;
+const RULE_INDENT = 24;
+const RULE_BOX_CSS = `border:1px solid var(--iron,#2b323b);padding:6px;margin:6px 0`;
+const RULE_HEAD_CSS = `display:flex;align-items:center;gap:${ROW_GAP}px;flex-wrap:wrap;margin:0 0 ${ROW_GAP}px`;
+const RULE_ROW_CSS = `display:flex;align-items:center;gap:${ROW_GAP}px;flex-wrap:wrap;margin:${ROW_GAP}px 0 0 ${RULE_INDENT}px`;
+const ICON_BUTTON_CSS = `${BUTTON_CSS};box-sizing:border-box;width:24px;min-width:24px;padding:0;line-height:20px;text-align:center`;
 
 function el(tag, css = '', text = '') {
   const node = document.createElement(tag);
@@ -463,6 +472,12 @@ function button(text, title, onClick, disabled = false) {
   b.title = title;
   b.disabled = disabled;
   b.onclick = onClick;
+  return b;
+}
+/** The ↑ ↓ ✕ buttons: one fixed size, so the glyph cannot change the width. */
+function iconButton(text, title, onClick, disabled = false) {
+  const b = button(text, title, onClick, disabled);
+  b.style.cssText = ICON_BUTTON_CSS;
   return b;
 }
 
@@ -539,7 +554,7 @@ function valueControl(def, c, changed) {
 
 function condLine(rule, c, j, refresh) {
   const def = FIELDS[c.f];
-  const row = el('div', 'display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:3px 0 0 18px');
+  const row = el('div', RULE_ROW_CSS);
   const used = new Set(rule.when.filter((x) => x !== c).map((x) => x.f));
   const fields = Object.keys(FIELDS).filter((k) => k === c.f || !used.has(k)).map((k) => [k, FIELDS[k].label]);
   row.appendChild(select(fields, c.f, (v) => {
@@ -553,18 +568,21 @@ function condLine(rule, c, j, refresh) {
     row.appendChild(el('span', 'font-size:13px', opText(c.op)));
   }
   row.appendChild(valueControl(def, c, () => { save(); refresh(); }));
-  row.appendChild(button('✕', 'Remove this condition', () => {
+  const remove = iconButton('✕', 'Remove this condition', () => {
     rule.when.splice(j, 1);
     save();
     buildPane(paneRoot);
-  }));
+  });
+  /* keep the small buttons in one column, under the rule's own ↑ ↓ ✕ */
+  remove.style.marginLeft = 'auto';
+  row.appendChild(remove);
   return row;
 }
 
 function ruleBox(f, rule, i) {
-  const box = el('div', 'border:1px solid var(--iron,#2b323b);padding:4px 6px;margin:4px 0');
-  const head = el('div', 'display:flex;align-items:center;gap:6px;flex-wrap:wrap');
-  head.appendChild(el('span', 'color:var(--dim,#b9b2a1);font-size:12px', `${i + 1}.`));
+  const box = el('div', RULE_BOX_CSS);
+  const head = el('div', RULE_HEAD_CSS);
+  head.appendChild(el('span', `color:var(--dim,#b9b2a1);font-size:12px;width:${RULE_INDENT - ROW_GAP}px;flex:0 0 ${RULE_INDENT - ROW_GAP}px;text-align:right`, `${i + 1}.`));
   head.appendChild(select([['hide', 'Hide'], ['show', 'Show']], rule.action, (v) => {
     rule.action = v;
     save();
@@ -573,9 +591,9 @@ function ruleBox(f, rule, i) {
   const summary = el('span', 'flex:1;min-width:160px;font-size:13px', ruleText(rule));
   head.appendChild(summary);
   head.append(
-    button('↑', 'Move up', () => { swap(f.rules, i, i - 1); save(); buildPane(paneRoot); }, i === 0),
-    button('↓', 'Move down', () => { swap(f.rules, i, i + 1); save(); buildPane(paneRoot); }, i === f.rules.length - 1),
-    button('✕', 'Delete this rule', () => { f.rules.splice(i, 1); save(); buildPane(paneRoot); }),
+    iconButton('↑', 'Move up', () => { swap(f.rules, i, i - 1); save(); buildPane(paneRoot); }, i === 0),
+    iconButton('↓', 'Move down', () => { swap(f.rules, i, i + 1); save(); buildPane(paneRoot); }, i === f.rules.length - 1),
+    iconButton('✕', 'Delete this rule', () => { f.rules.splice(i, 1); save(); buildPane(paneRoot); }),
   );
   box.appendChild(head);
 
@@ -585,7 +603,7 @@ function ruleBox(f, rule, i) {
   const used = new Set(rule.when.map((c) => c.f));
   const open = Object.keys(FIELDS).filter((k) => !used.has(k)).map((k) => [k, FIELDS[k].label]);
   if (open.length) {
-    const addRow = el('div', 'margin:3px 0 0 18px');
+    const addRow = el('div', `margin:${ROW_GAP}px 0 0 ${RULE_INDENT}px`);
     addRow.appendChild(select([['', '+ Add condition'], ...open], '', (v) => {
       if (!v) return;
       rule.when.push(newCond(v));

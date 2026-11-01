@@ -63,9 +63,9 @@ reloads a mod after it is updated. Everything there is described in
 
 ## Troubleshooting
 
-- **A mod is missing after a game update.** The game changed and the mod needs
-  an update too. To see which mods are applied:
-  `node modloader/check.mjs`.
+- **A mod is missing after a game update.** The game changed, so the mod needs
+  its matching update: pull the latest version of this folder. To see which mods
+  are applied: `node modloader/check.mjs`.
 - **“The game is already running.”** Close the game and start it through the
   shortcut again. If the game really is closed, run the shortcut with
   `--force` (`play.bat --force`, or `./play.sh --force`).

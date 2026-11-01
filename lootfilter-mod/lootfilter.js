@@ -437,8 +437,10 @@ export function hideCorpse(foe) {
 /* ---------------------------------------------------------------- config */
 let paneRoot = null;
 
-const CONTROL_CSS = 'background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:1px 4px';
-const BUTTON_CSS = 'cursor:pointer;background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:2px 8px';
+/* Every control shares one height; a select, a number field and a button then
+ * line up on the same baseline, and the small buttons stay square. */
+const CONTROL_CSS = 'box-sizing:border-box;height:26px;line-height:1.2;background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:1px 4px';
+const BUTTON_CSS = 'box-sizing:border-box;height:26px;line-height:1;cursor:pointer;background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);padding:0 8px;display:inline-flex;align-items:center;justify-content:center';
 /* One grid for a rule box: the number gutter (and so every control below it)
  * starts at the same x, rows share one gap, and the small buttons are one size
  * whatever the glyph is. */
@@ -447,7 +449,7 @@ const RULE_INDENT = 24;
 const RULE_BOX_CSS = `border:1px solid var(--iron,#2b323b);padding:6px;margin:6px 0`;
 const RULE_HEAD_CSS = `display:flex;align-items:center;gap:${ROW_GAP}px;flex-wrap:wrap;margin:0 0 ${ROW_GAP}px`;
 const RULE_ROW_CSS = `display:flex;align-items:center;gap:${ROW_GAP}px;flex-wrap:wrap;margin:${ROW_GAP}px 0 0 ${RULE_INDENT}px`;
-const ICON_BUTTON_CSS = `${BUTTON_CSS};box-sizing:border-box;width:24px;min-width:24px;padding:0;line-height:20px;text-align:center`;
+const ICON_BUTTON_CSS = `${BUTTON_CSS};width:26px;min-width:26px;padding:0`;
 
 function el(tag, css = '', text = '') {
   const node = document.createElement(tag);
@@ -666,7 +668,10 @@ function buildPane(container) {
   container.appendChild(el('div', 'margin-top:10px;color:var(--bone,#efe8d6);font-weight:600', `Rules (${f.rules.length}/${MAX_RULES})`));
   f.rules.forEach((rule, i) => container.appendChild(ruleBox(f, rule, i)));
 
-  container.appendChild(button('+ Add rule', 'Add a rule at the bottom of the list', () => {
+  /* the actions sit on one line: the list changes on the left, the big reset
+   * on the right */
+  const footer = el('div', `display:flex;align-items:center;gap:${ROW_GAP}px;flex-wrap:wrap;margin-top:8px`);
+  footer.appendChild(button('+ Add rule', 'Add a rule at the bottom of the list', () => {
     f.rules.push({ action: 'hide', when: [] });
     save();
     buildPane(paneRoot);
@@ -677,8 +682,9 @@ function buildPane(container) {
     save();
     buildPane(container);
   });
-  reset.style.marginTop = '8px';
-  container.appendChild(reset);
+  reset.style.marginLeft = 'auto';
+  footer.appendChild(reset);
+  container.appendChild(footer);
 }
 
 /* -------------------------------------------------------------- lifecycle */

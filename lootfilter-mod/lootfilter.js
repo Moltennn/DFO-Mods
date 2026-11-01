@@ -710,6 +710,37 @@ function buildPane(container) {
   container.appendChild(el('div', 'margin-top:10px;color:var(--bone,#efe8d6);font-weight:600', `Rules (${f.rules.length}/${MAX_RULES})`));
   f.rules.forEach((rule, i) => container.appendChild(ruleBox(f, rule, i)));
 
+  /* share: copy the list out, or paste one in (no clipboard permission needed -
+   * the box is the source of truth) */
+  const shareBox = el('details', 'margin-top:10px');
+  shareBox.appendChild(el('summary', 'cursor:pointer;font-size:12px;color:var(--dim,#b9b2a1)', 'Share rule list'));
+  const share = el('textarea', 'box-sizing:border-box;width:100%;height:64px;margin-top:4px;background:var(--slate,#171b21);color:var(--bone,#efe8d6);border:1px solid var(--iron,#2b323b);font:11px monospace;padding:4px');
+  share.placeholder = 'Rule list JSON';
+  shareBox.appendChild(share);
+  const shareRow = el('div', `display:flex;align-items:center;gap:${ROW_GAP}px;flex-wrap:wrap;margin-top:${ROW_GAP}px`);
+  const shareNote = el('span', 'color:var(--dim,#b9b2a1);font-size:11px', '');
+  shareRow.append(
+    button('Export rules', 'Put the rule list in the box (and on the clipboard)', () => {
+      const text = JSON.stringify(f.rules, null, 1);
+      share.value = text;
+      try { globalThis.navigator?.clipboard?.writeText?.(text); } catch { /* no clipboard */ }
+      try { share.select?.(); } catch { /* not a real textarea */ }
+      shareNote.textContent = f.rules.length ? 'copied' : 'nothing to copy';
+    }),
+    button('Import rules', 'Replace the rule list with the JSON in the box', () => {
+      let raw = null;
+      try { raw = JSON.parse(share.value); } catch { /* not JSON */ }
+      const list = Array.isArray(raw) ? raw : Array.isArray(raw?.rules) ? raw.rules : null;
+      if (!list) { shareNote.textContent = 'that is not a rule list'; return; }
+      f.rules = list.map(cleanRule).filter(Boolean).slice(0, MAX_RULES);
+      save();
+      buildPane(paneRoot);
+    }),
+    shareNote,
+  );
+  shareBox.appendChild(shareRow);
+  container.appendChild(shareBox);
+
   /* the actions sit on one line: the list changes on the left, the big reset
    * on the right */
   const footer = el('div', `display:flex;align-items:center;gap:${ROW_GAP}px;flex-wrap:wrap;margin-top:8px`);

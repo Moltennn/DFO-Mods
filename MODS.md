@@ -150,4 +150,5 @@ The selected row takes the **item it shows** — a visible row can no longer tak
 a different item that the filter hid at the same index. **Take all** is the
 exception: it still takes everything in the pile, hidden rows included.
 
-**ESC → Mods → Loot Filter** holds the rules.
+**ESC → Mods → Loot Filter** holds the rules. **Share rule list** copies the
+list out as JSON and takes one back, so a rule set can be shared or kept.

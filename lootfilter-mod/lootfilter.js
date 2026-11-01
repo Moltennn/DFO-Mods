@@ -23,7 +23,7 @@ const STORE_KEY = 'dfoLootFilter.config.v2';
 const OLD_STORE_KEY = 'dfoLootFilter.config.v1';
 const MAX_RULES = 20;
 
-const FILTER_TYPES = ['weapons', 'armor', 'gems', 'clothing', 'ingredients', 'potions', 'food', 'misc', 'books', 'religious', 'ammo'];
+const FILTER_TYPES = ['weapons', 'armor', 'clothing', 'jewellery', 'gems', 'ingredients', 'potions', 'food', 'books', 'religious', 'ammo', 'currency', 'clutter', 'misc'];
 const RARITY_RANK = { common: 0, magic: 1, rare: 2, legendary: 3, artifact: 4, aetheric: 5, gilded: 5 };
 const RARITY_NAMES = ['Common', 'Magic', 'Rare', 'Legendary', 'Artifact'];
 
@@ -35,6 +35,9 @@ const AMMO = /(?:^|\s)(pellets?|arrows?|bolts?|bullets?|darts?|sling stones?)$/i
  * Potions are the game's `Drugs` group. */
 const FOOD_TEMPLATES = new Set([531, 532, 533, 534, 535, 536, 537, 538]);
 const isFood = (item) => item?.group === 'UselessItems2' && FOOD_TEMPLATES.has(Number(item.templateIndex));
+/* The game's oddments, in one bucket: maps, furniture, paintings, deeds,
+ * transport, and the two "useless" groups (minus the food checked above). */
+const CLUTTER_GROUPS = new Set(['Maps', 'Furniture', 'Paintings', 'Deeds', 'Transportation', 'UselessItems1', 'UselessItems2']);
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.trunc(Number(n) || 0)));
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -225,6 +228,9 @@ function categoryOf(item) {
   if (isFood(item)) return 'food';
   if (group === 'Drugs') return 'potions';
   if (group === 'Gems') return 'gems';
+  if (group === 'Jewellery') return 'jewellery';
+  if (group === 'Currency') return 'currency';
+  if (CLUTTER_GROUPS.has(group)) return 'clutter';
   if (/Clothing/i.test(group)) return 'clothing';
   if (/Ingredient/i.test(group)) return 'ingredients';
   if (group === 'Weapons') return 'weapons';

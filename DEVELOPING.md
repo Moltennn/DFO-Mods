@@ -258,12 +258,16 @@ still shows the class.
 ## Loot Filter
 
 Rules combine as “hide if any matches”; quest items are never hidden. Types
-come from `group` (weapons, armor, gems, clothing, ingredients, misc, books,
-religious items, ammo); the game's `ReligiousItems` group (prayer beads,
-symbols, candles, the Holy Tome) is its own `religious` switch. Potions are
-the `Drugs` group. Food has no group of its own: it is the edible
-`UselessItems2` templates (531-538: Rations, Apple, Orange, Bread, Raw Fish,
-Cooked Fish, Meat, Raw Meat) - Waterskin (539) is a drink, not food.
+come from `group` (weapons, armor, clothing, jewellery, gems, ingredients,
+potions, food, books, religious items, ammo, currency, clutter, misc); the
+game's `ReligiousItems` group (prayer beads, symbols, candles, the Holy Tome)
+is its own `religious` switch. Potions are the `Drugs` group; gold is
+`Currency`; `Jewellery` is its own type. Food has no group of its own: it is
+the edible `UselessItems2` templates (531-538: Rations, Apple, Orange, Bread,
+Raw Fish, Cooked Fish, Meat, Raw Meat) - Waterskin (539) is a drink, not food.
+`clutter` is Maps, Furniture, Paintings, Deeds, Transportation and
+`UselessItems1/2` (minus food); `misc` is `MiscItems` and anything else, so a
+"hide misc" rule no longer catches gold.
 
 Patches:
 

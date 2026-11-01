@@ -629,6 +629,11 @@ function ruleBox(f, rule, i) {
   };
   head.appendChild(onBox);
   head.append(
+    iconButton('⧉', 'Duplicate this rule', () => {
+      f.rules.splice(i + 1, 0, JSON.parse(JSON.stringify(rule)));
+      save();
+      buildPane(paneRoot);
+    }),
     iconButton('↑', 'Move up', () => { swap(f.rules, i, i - 1); save(); buildPane(paneRoot); }, i === 0),
     iconButton('↓', 'Move down', () => { swap(f.rules, i, i + 1); save(); buildPane(paneRoot); }, i === f.rules.length - 1),
     iconButton('✕', 'Delete this rule', () => { f.rules.splice(i, 1); save(); buildPane(paneRoot); }),

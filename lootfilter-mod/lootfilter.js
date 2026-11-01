@@ -25,7 +25,7 @@ const MAX_RULES = 20;
 
 const FILTER_TYPES = ['weapons', 'armor', 'clothing', 'jewellery', 'gems', 'ingredients', 'potions', 'food', 'books', 'religious', 'ammo', 'currency', 'clutter', 'misc'];
 const RARITY_RANK = { common: 0, magic: 1, rare: 2, legendary: 3, artifact: 4, aetheric: 5, gilded: 5 };
-const RARITY_NAMES = ['Common', 'Magic', 'Rare', 'Legendary', 'Artifact'];
+const RARITY_NAMES = ['Common', 'Magic', 'Rare', 'Legendary', 'Artifact', 'Aetheric / Gilded'];
 
 /* Ammo and the Daggerfall material order (Leather 1, Chain 2, Iron 3 ...
  * Daedric 12) — the same scale the tier labels use. */
@@ -65,7 +65,7 @@ const NUM_OPS = ['=', '!=', '<', '<=', '>', '>='];
  * comparison; `ops` is what the user may choose from. */
 const FIELDS = {
   type: { label: 'Type', ops: ['=', '!='], kind: 'enum', values: FILTER_TYPES.map((t) => [t, label(t)]) },
-  rarity: { label: 'Rarity', ops: NUM_OPS, kind: 'num', min: 0, max: 4, names: RARITY_NAMES },
+  rarity: { label: 'Rarity', ops: NUM_OPS, kind: 'num', min: 0, max: 5, names: RARITY_NAMES },
   tier: { label: 'Tier', ops: NUM_OPS, kind: 'num', min: 1, max: 12 },
   stack: { label: 'Stack size', ops: NUM_OPS, kind: 'num', min: 1, max: 9999 },
   value: { label: 'Value', ops: NUM_OPS, kind: 'num', min: 0, max: 1000000, unit: ' gold' },

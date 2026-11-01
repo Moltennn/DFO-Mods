@@ -120,8 +120,8 @@ Conditions, each used once per rule:
   fish); *potions* covers every potion; *currency* is gold; *clutter* is the
   game's oddments (maps, furniture, paintings, deeds, transport and the
   "useless items" groups); *misc* is everything else.
-- **Rarity** — common / magic / rare / legendary / artifact (`=`, `≠`, `<`, `≤`,
-  `>`, `≥`).
+- **Rarity** — common / magic / rare / legendary / artifact / aetheric-gilded
+  (`=`, `≠`, `<`, `≤`, `>`, `≥`).
 - **Tier** — material tier 1–12 (`=`, `≠`, `<`, `≤`, `>`, `≥`). Only weapons and
   armour have a tier; a tier condition never matches anything else. Tiers run
   Leather 1, Chain 2, Iron 3 … Daedric 12, so weapons start at 3.

@@ -141,10 +141,12 @@ Example: *Hide when Rarity = Common and Tier ≤ 2* hides basic common leather
 and chain armour; it does not reach weapons, which start at tier 3.
 
 - **Enable loot filter** — the master switch.
+- **Hide corpses that carry no loot** — on by default.
 - **Show all while holding** — a held key (default **Alt**, ARPG-style) that
   bypasses the filter: every row returns and sleeping piles/corpses wake until
-  you let go. Click the key button and press another key to rebind; Backspace /
-  Delete sets **None**.
+  you let go. It only works in the world (with the pointer locked), not from an
+  inventory or a menu. Click the key button and press another key to rebind;
+  Backspace / Delete sets **None**.
 
 The selected row takes the **item it shows** — a visible row can no longer take
 a different item that the filter hid at the same index. **Take all** is the

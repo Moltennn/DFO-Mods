@@ -107,8 +107,15 @@ function revealMatches(ev) {
   if (!want || want.toLowerCase() === 'none') return false;
   return ev.key === want || String(ev.key).toLowerCase() === want.toLowerCase();
 }
+/** In the world means the pointer is locked. Opening the inventory or the pause
+ *  menu releases it, and holding the reveal key there (or while Alt-Tabbed)
+ *  must not wake every hidden pile. */
+function inWorld() {
+  try { return !!document.pointerLockElement; } catch { return true; }
+}
 function onRevealDown(ev) {
   if (keyCapture || ev.repeat || !revealMatches(ev)) return;
+  if (!inWorld()) return;
   if (!revealed) { revealed = true; syncPiles(); }
 }
 function onRevealUp(ev) {
@@ -120,11 +127,19 @@ function onRevealBlur() {
   revealed = false;
   syncPiles();
 }
+/** A menu opened while the key is held: drop the reveal with the pointer. */
+function onLockChange() {
+  if (!revealed) return;
+  try { if (document.pointerLockElement) return; } catch { return; }
+  revealed = false;
+  syncPiles();
+}
 function bindReveal() {
   if (keyBound || typeof window === 'undefined') return;
   window.addEventListener('keydown', onRevealDown, true);
   window.addEventListener('keyup', onRevealUp, true);
   window.addEventListener('blur', onRevealBlur);
+  document.addEventListener('pointerlockchange', onLockChange);
   keyBound = true;
 }
 function unbindReveal() {
@@ -132,11 +147,12 @@ function unbindReveal() {
   window.removeEventListener('keydown', onRevealDown, true);
   window.removeEventListener('keyup', onRevealUp, true);
   window.removeEventListener('blur', onRevealBlur);
+  document.removeEventListener('pointerlockchange', onLockChange);
   keyBound = false;
 }
 
 function defaults() {
-  return { on: false, revealKey: 'Alt', rules: [] };
+  return { on: false, revealKey: 'Alt', hideEmpty: true, rules: [] };
 }
 
 /* One condition, checked against the field's own rules. Returns null when the
@@ -206,6 +222,7 @@ function load() {
     const out = defaults();
     out.on = raw.on === true;
     out.revealKey = typeof raw.revealKey === 'string' && raw.revealKey ? raw.revealKey : 'Alt';
+    out.hideEmpty = raw.hideEmpty !== false;
     out.rules = Array.isArray(raw.rules) ? raw.rules.map(cleanRule).filter(Boolean) : [];
     return out;
   }
@@ -448,7 +465,8 @@ function syncPiles() {
 /** Nothing on the body would be shown: it is empty, or every item is filtered. */
 function hideItems(items) {
   if (!cfg?.on || revealed) return false;
-  if (!Array.isArray(items) || items.length === 0) return true;
+  if (!Array.isArray(items)) return false;
+  if (items.length === 0) return cfg?.hideEmpty !== false;
   return items.every((item) => !keep(item));
 }
 /** The renderer asks this before standing a dead foe's body (and its sprite). */
@@ -681,6 +699,14 @@ function buildPane(container) {
   enable.append(enableBox, el('span', '', 'Enable loot filter'));
   container.appendChild(enable);
 
+  const emptyLine = line('cursor:pointer');
+  const emptyBox = el('input');
+  emptyBox.type = 'checkbox';
+  emptyBox.checked = f.hideEmpty !== false;
+  emptyBox.onchange = () => { f.hideEmpty = emptyBox.checked; save(); };
+  emptyLine.append(emptyBox, el('span', '', 'Hide corpses that carry no loot'));
+  container.appendChild(emptyLine);
+
   // held reveal key: every row shows while it is down (Alt by default)
   const keyLine = line();
   keyLine.appendChild(labelSpan('Show all while holding'));
@@ -704,7 +730,7 @@ function buildPane(container) {
     window.addEventListener('keydown', done, true);
   };
   keyLine.appendChild(keyBtn);
-  keyLine.appendChild(el('span', 'color:var(--dim,#b9b2a1);font-size:11px', '(hold in game; Backspace = none)'));
+  keyLine.appendChild(el('span', 'color:var(--dim,#b9b2a1);font-size:11px', '(hold in the world; Backspace = none)'));
   container.appendChild(keyLine);
 
   container.appendChild(el('div', 'margin-top:10px;color:var(--bone,#efe8d6);font-weight:600', `Rules (${f.rules.length}/${MAX_RULES})`));

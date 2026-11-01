@@ -408,6 +408,9 @@ function syncPiles() {
   if (!Array.isArray(piles)) return;
   for (const pile of piles) {
     if (!pile || pile.dead) continue;
+    /* a chest is a container, not a pile of dropped loot: filtering its
+     * contents must not remove the chest itself from the world */
+    if (pile.container === true) continue;
     const items = pile.items;
     if (!Array.isArray(items) || !items.length) continue;
     const hide = hideItems(items);

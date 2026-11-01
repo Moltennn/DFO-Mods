@@ -69,9 +69,11 @@ const FIELDS = {
   tier: { label: 'Tier', ops: NUM_OPS, kind: 'num', min: 1, max: 12 },
   stack: { label: 'Stack size', ops: NUM_OPS, kind: 'num', min: 1, max: 9999 },
   value: { label: 'Value', ops: NUM_OPS, kind: 'num', min: 0, max: 1000000, unit: ' gold' },
+  condition: { label: 'Condition', ops: NUM_OPS, kind: 'num', min: 0, max: 100, unit: '%' },
   name: { label: 'Name', ops: ['contains'], kind: 'text' },
   enchanted: { label: 'Enchanted', ops: ['='], kind: 'bool' },
   artifact: { label: 'Artifact', ops: ['='], kind: 'bool' },
+  junk: { label: 'Junk', ops: ['='], kind: 'bool' },
   hands: { label: 'Hands', ops: ['=', '!='], kind: 'enum', values: [[1, 'One-handed'], [2, 'Two-handed']] },
   slot: { label: 'Armour slot', ops: ['=', '!='], kind: 'enum', values: SLOT_VALUES },
 };
@@ -316,6 +318,15 @@ function slotOf(item) {
   return SLOT_WORDS.find(([, words]) => words.some((w) => hasWord(item.name, w)))?.[0] ?? null;
 }
 
+/** Durability as a percentage of the item's own maximum, or null when the item
+ *  has no condition to lose (gems, ingredients, food...). */
+function conditionPercent(item) {
+  const max = Number(item?.maxCondition);
+  const cur = Number(item?.currentCondition);
+  if (!Number.isFinite(max) || max <= 0 || !Number.isFinite(cur)) return null;
+  return clamp(Math.round((cur / max) * 100), 0, 100);
+}
+
 /** The value a condition compares against, or null when the item has none. */
 function fieldValue(f, item) {
   switch (f) {
@@ -324,7 +335,9 @@ function fieldValue(f, item) {
     case 'tier': return tierOf(item);
     case 'stack': return Math.max(1, Math.trunc(Number(item.stackCount)) || 1);
     case 'value': return Number(item.value) || 0;
+    case 'condition': return conditionPercent(item);
     case 'name': return item.name ? String(item.name) : null;
+    case 'junk': return item.junk === true;
     case 'enchanted': return isEnchanted(item);
     case 'artifact': return !!item.artifact;
     case 'hands': return handsOf(item);

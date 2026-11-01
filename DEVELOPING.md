@@ -300,7 +300,9 @@ Runtime pieces:
 
 - `keep(item)` — display filter; walks the ordered rule list (first match wins).
   Conditions read `fieldValue(field, item)` (type, rarity, tier, stack, value,
-  name, enchanted, artifact, hands, slot); a missing value never matches. The
+  condition, name, enchanted, artifact, junk, hands, slot); a missing value
+  never matches. Condition is `currentCondition / maxCondition` as a percent,
+  null when the item has no durability; junk is the game's own `item.junk`. The
   v1 switches are converted once by `fromV1`. `enchanted` is any rarity above
   common: in game a magic item can carry only `rarity: 'magic'` with `magic: false`.
   Armour slots come from the Armor template table (102-112), then from the name.

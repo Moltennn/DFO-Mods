@@ -127,8 +127,11 @@ Conditions, each used once per rule:
   Leather 1, Chain 2, Iron 3 … Daedric 12, so weapons start at 3.
 - **Stack size** — the count in the stack (`=`, `≠`, `<`, `≤`, `>`, `≥`).
 - **Value** — gold (`=`, `≠`, `<`, `≤`, `>`, `≥`).
+- **Condition** — durability as a percentage of the item's own maximum
+  (`=`, `≠`, `<`, `≤`, `>`, `≥`). Items with no condition to lose (gems,
+  ingredients, food) never match it.
 - **Name** — contains text.
-- **Enchanted** (magic rarity or better) and **Artifact** — yes / no.
+- **Enchanted** (magic rarity or better), **Artifact** and **Junk** — yes / no.
 - **Hands** — one-handed or two-handed weapons.
 - **Armour slot** — chest, hands, legs, arms, head, feet, shield (`=`, `≠`).
 

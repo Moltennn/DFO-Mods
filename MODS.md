@@ -113,8 +113,9 @@ on the ground.
 
 Conditions, each used once per rule:
 
-- **Type** — weapons, armor, gems, clothing, ingredients, misc, books,
-  religious items, ammo (`=`, `≠`).
+- **Type** — weapons, armor, gems, clothing, ingredients, potions, food, misc,
+  books, religious items, ammo (`=`, `≠`). *Food* is the edible provisions
+  (rations, fruit, bread, meat, raw meat, fish); *potions* covers every potion.
 - **Rarity** — common / magic / rare / legendary / artifact (`=`, `≠`, `<`, `≤`,
   `>`, `≥`).
 - **Tier** — material tier 1–12 (`=`, `≠`, `<`, `≤`, `>`, `≥`). Only weapons and

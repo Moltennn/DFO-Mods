@@ -23,13 +23,18 @@ const STORE_KEY = 'dfoLootFilter.config.v2';
 const OLD_STORE_KEY = 'dfoLootFilter.config.v1';
 const MAX_RULES = 20;
 
-const FILTER_TYPES = ['weapons', 'armor', 'gems', 'clothing', 'ingredients', 'misc', 'books', 'religious', 'ammo'];
+const FILTER_TYPES = ['weapons', 'armor', 'gems', 'clothing', 'ingredients', 'potions', 'food', 'misc', 'books', 'religious', 'ammo'];
 const RARITY_RANK = { common: 0, magic: 1, rare: 2, legendary: 3, artifact: 4, aetheric: 5, gilded: 5 };
 const RARITY_NAMES = ['Common', 'Magic', 'Rare', 'Legendary', 'Artifact'];
 
 /* Ammo and the Daggerfall material order (Leather 1, Chain 2, Iron 3 ...
  * Daedric 12) — the same scale the tier labels use. */
 const AMMO = /(?:^|\s)(pellets?|arrows?|bolts?|bullets?|darts?|sling stones?)$/i;
+/* Food has no group of its own: the game's edibles live in UselessItems2 by
+ * template (Rations, Apple, Orange, Bread, Raw/Cooked Fish, Meat, Raw Meat).
+ * Potions are the game's `Drugs` group. */
+const FOOD_TEMPLATES = new Set([531, 532, 533, 534, 535, 536, 537, 538]);
+const isFood = (item) => item?.group === 'UselessItems2' && FOOD_TEMPLATES.has(Number(item.templateIndex));
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.trunc(Number(n) || 0)));
 const norm = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -217,6 +222,8 @@ function categoryOf(item) {
   if (!item) return 'misc';
   if (AMMO.test(String(item.name ?? ''))) return 'ammo';
   const group = String(item.group ?? '');
+  if (isFood(item)) return 'food';
+  if (group === 'Drugs') return 'potions';
   if (group === 'Gems') return 'gems';
   if (/Clothing/i.test(group)) return 'clothing';
   if (/Ingredient/i.test(group)) return 'ingredients';

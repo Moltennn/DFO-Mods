@@ -260,7 +260,10 @@ still shows the class.
 Rules combine as “hide if any matches”; quest items are never hidden. Types
 come from `group` (weapons, armor, gems, clothing, ingredients, misc, books,
 religious items, ammo); the game's `ReligiousItems` group (prayer beads,
-symbols, candles, the Holy Tome) is its own `religious` switch.
+symbols, candles, the Holy Tome) is its own `religious` switch. Potions are
+the `Drugs` group. Food has no group of its own: it is the edible
+`UselessItems2` templates (531-538: Rations, Apple, Orange, Bread, Raw Fish,
+Cooked Fish, Meat, Raw Meat) - Waterskin (539) is a drink, not food.
 
 Patches:
 

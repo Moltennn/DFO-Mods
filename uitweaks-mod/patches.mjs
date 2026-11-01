@@ -241,7 +241,14 @@ export function patch(store, log = () => {}) {
       if (!text.includes('cardLine?.')) {
         const meta = CARD_META_RX.exec(text);
         if (meta) {
-          text = text.replace(CARD_META_RX, (all, u, model, body, W) => `${u}=globalThis.__dfoUiTweaks?.cardLine?.(${model}.item)||[${model}.material,${model}.stack?\`\${${model}.stack} of them\`:null].filter(Boolean).join(\` · \`);${u}&&${body}.append(${W}(\`p\`,\`meta\`,${u}));{const _c=${body}.closest?.(\`.card\`)||${body},_t=globalThis.__dfoUiTweaks?.tierOf?.(${model}.item);_c&&_t&&(_c.dataset.dfoTier=_t)}`);
+          text = text.replace(CARD_META_RX, (all, u, model, body, W) =>
+            `${u}=globalThis.__dfoUiTweaks?.cardLine?.(${model}.item)||[${model}.material,${model}.stack?\`\${${model}.stack} of them\`:null].filter(Boolean).join(\` · \`);`
+            /* when the line is the game's own count ("2 of them"), it is not a
+             * material line and must not take the item's colour */
+            + `const _plain=!globalThis.__dfoUiTweaks?.cardLine?.(${model}.item);`
+            + `${u}&&${body}.append(${W}(\`p\`,\`meta\`,${u}));`
+            + `{const _c=${body}.closest?.(\`.card\`)||${body},_t=globalThis.__dfoUiTweaks?.tierOf?.(${model}.item);`
+            + `_c&&_t&&(!_plain||globalThis.__dfoUiTweaks?.isQuest?.(${model}.item))&&(_c.dataset.dfoTier=_t)}`);
           log(`  patched ${card.rel} (card meta line)`);
         } else if (text.includes(A_META)) {
           text = text.replace(A_META, B_META);

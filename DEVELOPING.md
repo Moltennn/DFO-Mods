@@ -188,7 +188,10 @@ Patches:
    row as `data-tier` and `ing` as `data-dfo-ing` (the ingredient glyph).
 3. `assets/enhancedInventory-*.js` — the card's line under the name asks
    `__dfoUiTweaks.cardLine(item)`, its stat list asks `itemFacts(item)`, and the
-   card gets `data-dfo-tier`. The pack/loot-window rows ask `rowName(item, name)`,
+   card gets `data-dfo-tier` — but only when that line is ours (or the item is a
+   quest item). When the line is the game's own count ("2 of them") the card is
+   left uncoloured, so a gem stack's count does not read as part of the name.
+   The pack/loot-window rows ask `rowName(item, name)`,
    `cardLine(item)` for the tag line and `decorateRow(row, item)` for the colour
    keys; a pack row's name drops the game's ` ×N`, since the row's corner
    `.count` badge already shows the stack (that repeated count took the tier/gem

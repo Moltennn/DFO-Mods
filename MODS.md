@@ -136,6 +136,7 @@ Conditions, each used once per rule:
 - **Armour slot** — chest, hands, legs, arms, head, feet, shield (`=`, `≠`).
 
 A rule with no conditions matches everything. The list holds up to 20 rules.
+The checkbox on the right of a rule mutes it without deleting it (it dims).
 Example: *Hide when Rarity = Common and Tier ≤ 2* hides basic common leather
 and chain armour; it does not reach weapons, which start at tier 3.
 

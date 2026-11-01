@@ -170,7 +170,7 @@ function cleanRule(raw) {
     const c = cleanCond(r);
     if (c && !seen.has(c.f)) { seen.add(c.f); when.push(c); }
   }
-  return { action: raw.action === 'show' ? 'show' : 'hide', when };
+  return { action: raw.action === 'show' ? 'show' : 'hide', when, ...(raw.off === true ? { off: true } : {}) };
 }
 
 /* The old switches become rules, in the old precedence: keep names first, then
@@ -381,6 +381,7 @@ export function keep(item) {
   if (!cfg?.on || !item || typeof item !== 'object') return true;
   if (item.questItem) return true; // quest items are never junk
   for (const rule of cfg.rules) {
+    if (rule.off === true) continue; // muted in the pane
     if (ruleHolds(rule, item)) return rule.action !== 'hide';
   }
   return true;
@@ -614,11 +615,25 @@ function ruleBox(f, rule, i) {
   }));
   const summary = el('span', 'flex:1;min-width:160px;font-size:13px', ruleText(rule));
   head.appendChild(summary);
+  /* a rule can be muted without being deleted: it stays in the list, dimmed,
+   * and keep() walks past it */
+  const onBox = el('input', 'margin:0');
+  onBox.type = 'checkbox';
+  onBox.checked = rule.off !== true;
+  onBox.title = 'Rule on (untick to mute it)';
+  onBox.onchange = () => {
+    if (onBox.checked) delete rule.off;
+    else rule.off = true;
+    save();
+    box.style.opacity = rule.off === true ? '.55' : '';
+  };
+  head.appendChild(onBox);
   head.append(
     iconButton('↑', 'Move up', () => { swap(f.rules, i, i - 1); save(); buildPane(paneRoot); }, i === 0),
     iconButton('↓', 'Move down', () => { swap(f.rules, i, i + 1); save(); buildPane(paneRoot); }, i === f.rules.length - 1),
     iconButton('✕', 'Delete this rule', () => { f.rules.splice(i, 1); save(); buildPane(paneRoot); }),
   );
+  if (rule.off === true) box.style.opacity = '.55';
   box.appendChild(head);
 
   const refresh = () => { summary.textContent = ruleText(rule); };

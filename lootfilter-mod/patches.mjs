@@ -235,7 +235,30 @@ export function patch(store, log = () => {}) {
       checks.push({ rel: bodies.rel, has: 'hideCorpse' });
     }
 
-    // ---- 4. the mod itself ----------------------------------------------
+    // ---- 4. the physical item sprites (loot drawn on the ground) --------
+    /* The game renders each corpse item as a small world sprite and one sprite
+     * per dropped pile ("physical items"). A hidden item has to lose its sprite
+     * too, or the filter only hides the plaque row while the item still lies
+     * there to be seen. */
+    {
+      const PHYS_CORPSE = /(\(Array\.isArray\(n\.items\)\?n\.items:\[\]\)\.filter\(t=>[A-Za-z0-9_$]+\(t,e\))\)/;
+      const PHYS_PILE = /(n\.items\?\.)\[0\](;if\(![A-Za-z0-9_$]+\|\|n\.dead\|\|n\.inactive\)continue;)/;
+      const KEEPER = 'globalThis.__dfoRowFilter?.keep?.(t)??true';
+      const chunk = store.findChunk({ test: (t) => PHYS_CORPSE.test(t) && PHYS_PILE.test(t) });
+      if (!chunk) deferOrDie('the item-sprite anchors were not found and the bundled build is not readable - start the game, then retry', seed);
+      let text = chunk.text;
+      if (text.includes(KEEPER)) log(`  item sprites already filtered (${chunk.rel})`);
+      else {
+        text = text.replace(PHYS_CORPSE, (m, head) => `${head}&&(${KEEPER}))`);
+        /* a pile shows one sprite: use the first item the filter keeps */
+        text = text.replace(PHYS_PILE, (m, head, tail) => `${head}find(t=>${KEEPER})${tail}`);
+        log(`  patched ${chunk.rel} (hidden items lose their world sprite)`);
+      }
+      store.write(chunk.rel, Buffer.from(text));
+      checks.push({ rel: chunk.rel, has: KEEPER });
+    }
+
+    // ---- 5. the mod itself ----------------------------------------------
     const buildId = computeBuild();
     const mod = Buffer.from(fs.readFileSync(MOD_SRC, 'utf8')
       .replace("'@BUILD@'", `'${buildId}'`), 'utf8');

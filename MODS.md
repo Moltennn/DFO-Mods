@@ -107,7 +107,9 @@ Hides junk from the world plaque. It is a list of rules: each rule is **Show** o
 the first match decides; an item no rule matches is shown. Quest items are never
 hidden. Hidden items never reach the plaque, and a pile or corpse with nothing
 left to show is put to sleep so it leaves the world's sprites and loot targets
-too — nothing is ever deleted, and clearing the rule wakes it intact.
+too — nothing is ever deleted, and clearing the rule wakes it intact. A hidden
+item also loses its own little world sprite, so only the loot you keep is drawn
+on the ground.
 
 Conditions, each used once per rule:
 

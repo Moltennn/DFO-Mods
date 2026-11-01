@@ -277,7 +277,14 @@ Patches:
    marked `castOnly` at the start of each renderer's corpse loop: the body is
    skipped, and the game only suppresses the marker while it stands the body,
    so without this an emptied body was left showing its sprite.
-5. `assets/dfo-lootfilter.js` — the mod.
+5. `assets/deepWaterRuntime-*.js` — the physical item sprites (the "physical
+   items" enhancement): each corpse item is drawn as a small billboard and each
+   dropped pile as one. Both now ask `__dfoRowFilter.keep(item)` - the corpse
+   list filters the eligible items, and a pile shows its first *kept* item - so
+   a hidden item loses its sprite along with its plaque row. Existing proxies
+   are dropped by the system's own cleanup when the item leaves that list, and
+   the reveal key brings them back.
+6. `assets/dfo-lootfilter.js` — the mod.
 
 Runtime pieces:
 

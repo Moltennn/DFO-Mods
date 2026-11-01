@@ -152,7 +152,7 @@ function unbindReveal() {
 }
 
 function defaults() {
-  return { on: false, revealKey: 'Alt', hideEmpty: true, rules: [] };
+  return { on: false, revealKey: 'Alt', hideEmpty: true, takeAllSkipsHidden: false, rules: [] };
 }
 
 /* One condition, checked against the field's own rules. Returns null when the
@@ -223,6 +223,7 @@ function load() {
     out.on = raw.on === true;
     out.revealKey = typeof raw.revealKey === 'string' && raw.revealKey ? raw.revealKey : 'Alt';
     out.hideEmpty = raw.hideEmpty !== false;
+    out.takeAllSkipsHidden = raw.takeAllSkipsHidden === true;
     out.rules = Array.isArray(raw.rules) ? raw.rules.map(cleanRule).filter(Boolean) : [];
     return out;
   }
@@ -460,6 +461,17 @@ function syncPiles() {
       hiddenByUs.delete(pile);
     }
   }
+}
+
+/* Take all: by default it still takes the whole pile, hidden rows included.
+ * With this option on, a take-all on world loot skips what the filter hides.
+ * Player storage, the wagon, the materials bag and quest rewards are never
+ * touched - the loot window stays unfiltered on purpose. */
+const TAKE_ALL_KINDS = new Set(['ground', 'container']);
+export function takeAllSkips(item, kind) {
+  if (!cfg?.on || cfg.takeAllSkipsHidden !== true) return false;
+  if (!TAKE_ALL_KINDS.has(String(kind ?? ''))) return false;
+  return !keep(item);
 }
 
 /** Nothing on the body would be shown: it is empty, or every item is filtered. */
@@ -707,6 +719,14 @@ function buildPane(container) {
   emptyLine.append(emptyBox, el('span', '', 'Hide corpses that carry no loot'));
   container.appendChild(emptyLine);
 
+  const takeLine = line('cursor:pointer');
+  const takeBox = el('input');
+  takeBox.type = 'checkbox';
+  takeBox.checked = f.takeAllSkipsHidden === true;
+  takeBox.onchange = () => { f.takeAllSkipsHidden = takeBox.checked; save(); };
+  takeLine.append(takeBox, el('span', '', 'Take all skips hidden items (world loot only)'));
+  container.appendChild(takeLine);
+
   // held reveal key: every row shows while it is down (Alt by default)
   const keyLine = line();
   keyLine.appendChild(labelSpan('Show all while holding'));
@@ -789,7 +809,7 @@ function buildPane(container) {
 /* -------------------------------------------------------------- lifecycle */
 export function install() {
   cfg ??= load();
-  globalThis.__dfoRowFilter = { keep, hideCorpse, pick };
+  globalThis.__dfoRowFilter = { keep, hideCorpse, pick, takeAllSkips };
   bindReveal();
   syncPiles();
   pileTimer ??= setInterval(syncPiles, 700);

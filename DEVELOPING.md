@@ -294,7 +294,12 @@ Patches:
    a hidden item loses its sprite along with its plaque row. Existing proxies
    are dropped by the system's own cleanup when the item leaves that list, and
    the reveal key brings them back.
-6. `assets/dfo-lootfilter.js` — the mod.
+6. `assets/enhancedInventory-*.js` — the take-all list (`take ? lootItems :
+   packTabItems`) is gated by `__dfoRowFilter.takeAllSkips(item, kind)`. Only
+   `ground` and `container` loot is filtered, and only when the option is on;
+   the loot window itself stays unfiltered (it also shows the player's own
+   storage, wagon and bag).
+7. `assets/dfo-lootfilter.js` — the mod.
 
 Runtime pieces:
 
@@ -311,8 +316,11 @@ Runtime pieces:
   sleep (`inactive` / `corpseDisabled`), never deleted; the 700 ms sync wakes
   anything the filter no longer hides.
 - Reveal key (`revealKey`, default Alt): held → `keep` true and the hide
-  helpers false, and the sync wakes everything; release/blur re-sleeps. Bound
-  in capture phase on `window`.
+  helpers false, and the sync wakes everything; release/blur/pointer-unlock
+  re-sleeps. Bound in capture phase on `window`, and only engages while the
+  pointer is locked (in the world), so menus and Alt-Tab do not wake anything.
+- `takeAllSkips(item, kind)`: true only when `takeAllSkipsHidden` is on, the
+  loot `kind` is `ground`/`container`, and `keep` would hide the item.
 
 ## Launcher
 

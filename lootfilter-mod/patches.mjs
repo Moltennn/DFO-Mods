@@ -258,7 +258,29 @@ export function patch(store, log = () => {}) {
       checks.push({ rel: chunk.rel, has: KEEPER });
     }
 
-    // ---- 5. the mod itself ----------------------------------------------
+    // ---- 5. take all on world loot skips hidden items (opt-in) ----------
+    /* The take-all button built its list as `take ? itemsOfTheLootState :
+     * packTabItems`. Gate that list with the mod's own option; the loot window
+     * itself stays unfiltered (it also shows the player's storage). */
+    {
+      const TAKE_RX = /([A-Za-z0-9_$]+)\?([A-Za-z0-9_$]+)\(([A-Za-z0-9_$]+)\.items,([A-Za-z0-9_$]+)\(\),([A-Za-z0-9_$]+)\):([A-Za-z0-9_$]+)\.tabs\.find\(/;
+      const chunk = store.findChunk({ test: (t) => TAKE_RX.test(t) || t.includes('takeAllSkips?.(') });
+      if (!chunk) deferOrDie('the take-all anchor was not found and the bundled build is not readable - start the game, then retry', seed);
+      let text = chunk.text;
+      if (text.includes('takeAllSkips?.')) log(`  take-all hook already present (${chunk.rel})`);
+      else {
+        const m = TAKE_RX.exec(text);
+        if (!m) die('the take-all anchor was not found - aborting (nothing written)');
+        const [all, take, listFn, state, rarityFn, nameFn, tabs] = m;
+        text = text.replace(all, () => `${take}?${listFn}(${state}.items,${rarityFn}(),${nameFn})`
+          + `.filter(e=>!(globalThis.__dfoRowFilter?.takeAllSkips?.(e,${state}.kind)??false)):${tabs}.tabs.find(`);
+        log(`  patched ${chunk.rel} (take all skips hidden world loot)`);
+      }
+      store.write(chunk.rel, Buffer.from(text));
+      checks.push({ rel: chunk.rel, has: 'takeAllSkips?.' });
+    }
+
+    // ---- 6. the mod itself ----------------------------------------------
     const buildId = computeBuild();
     const mod = Buffer.from(fs.readFileSync(MOD_SRC, 'utf8')
       .replace("'@BUILD@'", `'${buildId}'`), 'utf8');

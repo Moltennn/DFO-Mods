@@ -149,8 +149,10 @@ and chain armour; it does not reach weapons, which start at tier 3.
   Backspace / Delete sets **None**.
 
 The selected row takes the **item it shows** — a visible row can no longer take
-a different item that the filter hid at the same index. **Take all** is the
-exception: it still takes everything in the pile, hidden rows included.
+a different item that the filter hid at the same index. **Take all** normally
+takes everything in the pile, hidden rows included; **Take all skips hidden
+items** (off by default) makes it obey the filter for world loot. It never
+touches your storage, wagon, bag or quest rewards.
 
 **ESC → Mods → Loot Filter** holds the rules. **Share rule list** copies the
 list out as JSON and takes one back, so a rule set can be shared or kept.

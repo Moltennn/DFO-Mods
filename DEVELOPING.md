@@ -301,7 +301,8 @@ Runtime pieces:
 
 1. resolves the game (workspace `*.AppImage`, `game-path.txt`, installed
    asar→exe/app, or `--app=`),
-2. starts `lib/serve.mjs` on `127.0.0.1` (an OS-chosen port),
+2. starts `lib/serve.mjs` on `127.0.0.1` (port 47831; `DFO_MODS_PORT` overrides,
+   and a taken port falls back to a free one for that launch),
 3. starts the launcher with `DAGGER_DEV_URL` set to that server's game page,
    and stays up while the game runs (the launcher can restart itself, so it waits
    for the game to close, not just for its own child).
@@ -309,10 +310,44 @@ Runtime pieces:
 Everything after `--` goes to the game. If the game is already running, the
 wrapper says so and exits: the mods only apply to a game it started.
 
+Two opt-in fallbacks, for a launcher that will not start or a wrong running-game
+report (both leave the normal shortcut unchanged):
+
+- `--force` skips the running-game probe. The game's own single-instance lock is
+  still the authority, so a real instance simply exits. The probe
+  (`runningAppAsars`) only counts a process whose `resources/app.asar` is the
+  game's own (`isGameAsar`: package name `daggerfall-js-app`, a DFO product
+  name, or a `game-seed.json`) - every Electron app has an `app.asar`, and
+  Windows lists every process path.
+- `--serve-only` starts no launcher: it serves the patched build, prints the
+  per-platform command to start the game with `DAGGER_DEV_URL` set, and stays up
+  until Ctrl+C. No probe, no spawn:
+
+  ```
+  cmd:         set DAGGER_DEV_URL=<url> && start "" "C:\Program Files\DFO Online\DFO Online.exe"
+  PowerShell:  $env:DAGGER_DEV_URL="<url>"; Start-Process "…\DFO Online.exe"
+  bash:        DAGGER_DEV_URL=<url> ./DFO-Online-linux-x86_64.AppImage
+  ```
+
+  A spawn failure keeps the server up and prints the same command, so the mods
+  still load.
+
 `DAGGER_DEV_URL` makes the launcher return early when it opens the game window,
 so the window skips the rollback, load-failure and crash handlers that run for
-`dagger://` games. This is the accepted trade-off for modded play (README,
-"What this changes").
+`dagger://` games. That is the accepted trade-off for modded play: a broken
+channel build stays current until a fixed one ships, unless the game is started
+without the mods.
+
+## Mod settings
+
+Settings are kept in `localStorage` of the game page (all three share the
+served origin):
+
+- Loot Filter — `dfoLootFilter.config.v2` (rules, reveal key, master switch).
+  The pre-rules `dfoLootFilter.config.v1` is converted once at startup and left
+  in place, unread.
+- Skill Tracker — `dfoLevelTracker.config.v2` (v1 is migrated on first run).
+- UI Tweaks — `dfoUiTweaks.config.v1`.
 
 ## Checks
 

@@ -1,3 +1,4 @@
+[Español](README.es.md)
 # DFO Online Mods
 
 Three small, client-side mods for the desktop version of **DFO Online**:

@@ -82,10 +82,20 @@ export function patch(store, log = () => {}) {
       const B_ARM = 'mods:(r)=>{if(typeof globalThis<`u`&&globalThis.__dfoModsPane)globalThis.__dfoModsPane(r)},';
       const OLD_RAIL = '[`screenshots`,`Screenshots`],[`leveltracker`,`Level Tracker`],[`about`,`About`]';
       const OLD_ARM = 'leveltracker:(r)=>{if(typeof globalThis<`u`&&globalThis.__dfoLT)globalThis.__dfoLT(r)},';
+      /* 0.1.14631 rebuilt the pause menu: the ESC screen's SYSTEM tab lists
+       * its own sections (a frozen [key,label] list) and draws the pane from a
+       * map keyed the same way. The boot menu's rail is a different list. */
+      const C_TAIL = '[`screenshots`,`Screenshots`],[`about`,`About`],[`exit`,`Exit`]]';
+      const D_TAIL = '[`screenshots`,`Screenshots`],[`mods`,`Mods`],[`about`,`About`],[`exit`,`Exit`]]';
+      const C_DISP = /screenshots:([A-Za-z0-9_$]{1,4}),about:([A-Za-z0-9_$]{1,4}),exit:([A-Za-z0-9_$]{1,4})\}\[([A-Za-z0-9_$]{1,4})\]/;
+      const D_ARM = 'mods:e=>{if(typeof globalThis<`u`&&globalThis.__dfoModsPane)globalThis.__dfoModsPane(e)},';
+
 
       const menu = store.findChunk({
         prefixes: ['enhancedMenu-'],
-        test: (t) => (t.includes(A_RAIL) && A_DISP.test(t)) || (t.includes(B_RAIL) && t.includes('__dfoModsPane')) || t.includes(OLD_RAIL),
+        test: (t) => (t.includes(A_RAIL) && A_DISP.test(t)) || (t.includes(B_RAIL) && t.includes('__dfoModsPane'))
+          || t.includes(OLD_RAIL)
+          || (t.includes(C_TAIL) && C_DISP.test(t)) || (t.includes(D_TAIL) && t.includes('__dfoModsPane')),
       });
       if (!menu) deferOrDie('ESC menu anchors not found and the bundled build is not readable - start the game, then retry', seed);
       let text = menu.text;
@@ -93,8 +103,13 @@ export function patch(store, log = () => {}) {
         text = text.replace(OLD_RAIL, A_RAIL).replace(OLD_ARM, '');
         log(`  migrated the old leveltracker entry (${menu.rel})`);
       }
-      if (text.includes(B_RAIL) && text.includes('__dfoModsPane')) log(`  esc menu already patched (${menu.rel})`);
-      else {
+      if ((text.includes(B_RAIL) || text.includes(D_TAIL)) && text.includes('__dfoModsPane')) log(`  esc menu already patched (${menu.rel})`);
+      else if (text.includes(C_TAIL)) {
+        const m = text.match(C_DISP);
+        if (!m) die('ESC menu anchors not found - aborting');
+        text = text.replace(C_TAIL, D_TAIL).replace(m[0], m[0].replace('about:', `${D_ARM}about:`));
+        log(`  patched ${menu.rel} (Mods pane)`);
+      } else {
         const m = text.match(A_DISP);
         if (!m) die('ESC menu anchors not found - aborting');
         text = text.replace(A_RAIL, B_RAIL).replace(m[0], m[0].replace('{', `{${B_ARM}`));

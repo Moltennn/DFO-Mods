@@ -141,8 +141,10 @@ Patches:
 1. `assets/worldTick-*.js` — the skill check keeps `window.__playerEntity`
    pointing at the live character, and the app's debug hook no longer deletes
    it. The hook's minified call alias is captured.
-2. `assets/enhancedMenu-*.js` — one rail entry (`Mods`) and one dispatch arm
-   calling `globalThis.__dfoModsPane`.
+2. `assets/enhancedMenu-*.js` — one section entry (`Mods`) and one dispatch
+   arm calling `globalThis.__dfoModsPane`. The pause screen's SYSTEM tab has
+   its own frozen section list and its own pane map (0.1.14631 rebuilt the
+   menu); the patch knows both the old rail shape and the new one.
 3. the layout editor's chunk (e.g. `revenantCard-*.js`) — the `dfoLT` piece and
    the piece table exported as `hz`.
 4. `assets/dfo-skillhud.js` — the mod itself.
